@@ -4,98 +4,76 @@ import 'leaflet/dist/leaflet.css'
 import './RouteMap.css'
 
 interface RouteMapProps {
-  origin?: { lat: number; lng: number }
+  origin?:      { lat: number; lng: number }
   destination?: { lat: number; lng: number }
-  originAddress?: string
+  originAddress?:      string
   destinationAddress?: string
+  routeCoords?: [number, number][]
 }
 
-export default function RouteMap({ origin, destination, originAddress, destinationAddress }: RouteMapProps) {
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<L.Map | null>(null)
-  const markersRef = useRef<L.Marker[]>([])
-  const polylineRef = useRef<L.Polyline | null>(null)
+export default function RouteMap({ origin, destination, originAddress, destinationAddress, routeCoords }: RouteMapProps) {
+  const mapRef      = useRef<HTMLDivElement>(null)
+  const mapObj      = useRef<L.Map | null>(null)
+  const markersRef  = useRef<L.Marker[]>([])
+  const polyRef     = useRef<L.Polyline | null>(null)
 
   useEffect(() => {
-    if (!mapContainer.current) return
-
-    // Inicializar mapa uma vez
-    if (!map.current) {
-      map.current = L.map(mapContainer.current, {
-        attributionControl: false,
-      }).setView([-10, -51], 4)
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map.current)
+    if (!mapRef.current) return
+    if (!mapObj.current) {
+      mapObj.current = L.map(mapRef.current, { attributionControl: false, zoomControl: true })
+        .setView([-15, -50], 4)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+        .addTo(mapObj.current)
     }
 
-    // Limpar markers anteriores
-    markersRef.current.forEach((marker) => map.current!.removeLayer(marker))
+    // Limpar
+    markersRef.current.forEach(m => mapObj.current!.removeLayer(m))
     markersRef.current = []
+    if (polyRef.current) { mapObj.current.removeLayer(polyRef.current); polyRef.current = null }
 
-    if (polylineRef.current) {
-      map.current.removeLayer(polylineRef.current)
-      polylineRef.current = null
+    const blueIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+      iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
+    })
+    const redIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+      iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
+    })
+
+    if (origin) {
+      const m = L.marker([origin.lat, origin.lng], { icon: blueIcon })
+        .bindPopup(`<b>Origem</b><br>${originAddress || ''}`)
+      m.addTo(mapObj.current!)
+      markersRef.current.push(m)
     }
 
-    // Adicionar marker de origem
-    if (origin && map.current) {
-      const marker = L.marker([origin.lat, origin.lng], {
-        icon: L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
-      }).bindPopup('📍 Origem')
-
-      map.current.addLayer(marker)
-      markersRef.current.push(marker)
+    if (destination) {
+      const m = L.marker([destination.lat, destination.lng], { icon: redIcon })
+        .bindPopup(`<b>Destino</b><br>${destinationAddress || ''}`)
+      m.addTo(mapObj.current!)
+      markersRef.current.push(m)
     }
 
-    // Adicionar marker de destino
-    if (destination && map.current) {
-      const marker = L.marker([destination.lat, destination.lng], {
-        icon: L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
-      }).bindPopup('🎯 Destino')
+    if (origin && destination) {
+      const coords: [number,number][] = routeCoords && routeCoords.length > 2
+        ? routeCoords
+        : [[origin.lat, origin.lng], [destination.lat, destination.lng]]
 
-      map.current.addLayer(marker)
-      markersRef.current.push(marker)
+      polyRef.current = L.polyline(coords, {
+        color: '#e63946', weight: 5, opacity: 0.9
+      }).addTo(mapObj.current!)
+
+      mapObj.current!.fitBounds(polyRef.current.getBounds(), { padding: [50, 50] })
     }
-
-    // Desenhar linha e ajustar zoom
-    if (origin && destination && map.current) {
-      polylineRef.current = L.polyline(
-        [[origin.lat, origin.lng], [destination.lat, destination.lng]],
-        {
-          color: '#e63946',
-          weight: 5,
-          opacity: 0.95,
-          dashArray: '0',
-        }
-      ).addTo(map.current)
-
-      const bounds = L.latLngBounds([[origin.lat, origin.lng], [destination.lat, destination.lng]])
-      map.current.fitBounds(bounds, { padding: [80, 80] })
-    }
-  }, [origin, destination])
+  }, [origin, destination, routeCoords])
 
   return (
     <div className="route-map-container">
       <div className="map-header">
         <h3>Mapa da Rota</h3>
-        {originAddress && destinationAddress && (
+        {originAddress && (
           <div className="route-info">
             <div className="location origin-location">
               <span className="location-icon">📍</span>
@@ -104,19 +82,22 @@ export default function RouteMap({ origin, destination, originAddress, destinati
                 <span className="location-address">{originAddress}</span>
               </div>
             </div>
-            <div className="route-arrow">↓</div>
-            <div className="location dest-location">
-              <span className="location-icon">🎯</span>
-              <div className="location-details">
-                <span className="location-label">Destino</span>
-                <span className="location-address">{destinationAddress}</span>
-              </div>
-            </div>
+            {destinationAddress && (
+              <>
+                <div className="route-arrow">↓</div>
+                <div className="location dest-location">
+                  <span className="location-icon">🎯</span>
+                  <div className="location-details">
+                    <span className="location-label">Destino</span>
+                    <span className="location-address">{destinationAddress}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
-
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapRef} className="map-container" />
     </div>
   )
 }

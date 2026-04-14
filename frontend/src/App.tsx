@@ -31,7 +31,7 @@ function App() {
       </header>
 
       <main className="app-main">
-        <Calculator token={null} />
+        <Calculator />
       </main>
 
       <footer className="app-footer">
