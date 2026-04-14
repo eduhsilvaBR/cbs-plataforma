@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import apiClient from '../utils/api'
 import RouteMap from './RouteMap'
 import './Calculator.css'
 
@@ -92,7 +93,7 @@ export default function Calculator({ token }: CalculatorProps) {
       // Atualizar mapa antes de calcular
       await updateMapCoordinates()
 
-      const response = await axios.post('/api/calculate', {
+      const response = await apiClient.post('/api/calculate', {
         vehicleType,
         pricePerKm: parseFloat(pricePerKm),
         originAddress: origin,
@@ -128,7 +129,7 @@ export default function Calculator({ token }: CalculatorProps) {
     if (!result) return
 
     try {
-      const response = await axios.get(`/api/budgets/${result.id}/pdf`, {
+      const response = await apiClient.get(`/api/budgets/${result.id}/pdf`, {
         responseType: 'blob'
       })
 
