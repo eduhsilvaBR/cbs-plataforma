@@ -21,7 +21,7 @@ function App() {
               <img src="/logo cbs.png" alt="CBS Logo" className="logo" onError={(e) => {
                 e.currentTarget.style.display = 'none'
               }} />
-              <h1>CBS Frete</h1>
+              <h1>CBS Transportes Náuticos</h1>
             </div>
             <nav className="nav">
               <span className="nav-text">Calculadora Inteligente de Frete</span>

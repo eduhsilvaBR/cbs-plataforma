@@ -90,7 +90,6 @@
 .splash-logo {
   width: 150px;
   height: auto;
-  filter: brightness(0) invert(1);
   animation: pulse 2.5s infinite;
 }
 
