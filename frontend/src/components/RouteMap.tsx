@@ -94,17 +94,23 @@ export default function RouteMap({ origin, destination, originAddress, destinati
   return (
     <div className="route-map-container">
       <div className="map-header">
-        <h3>Mapa da Rota 🗺️</h3>
+        <h3>Mapa da Rota</h3>
         {originAddress && destinationAddress && (
           <div className="route-info">
-            <div className="location">
-              <span className="dot origin">📍</span>
-              <span className="address">{originAddress}</span>
+            <div className="location origin-location">
+              <span className="location-icon">📍</span>
+              <div className="location-details">
+                <span className="location-label">Origem</span>
+                <span className="location-address">{originAddress}</span>
+              </div>
             </div>
-            <div className="arrow">→</div>
-            <div className="location">
-              <span className="dot destination">🎯</span>
-              <span className="address">{destinationAddress}</span>
+            <div className="route-arrow">↓</div>
+            <div className="location dest-location">
+              <span className="location-icon">🎯</span>
+              <div className="location-details">
+                <span className="location-label">Destino</span>
+                <span className="location-address">{destinationAddress}</span>
+              </div>
             </div>
           </div>
         )}
