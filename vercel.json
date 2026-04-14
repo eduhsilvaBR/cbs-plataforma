@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm install && npm run build",
-  "outputDirectory": "frontend/dist",
+  "buildCommand": "npm install && npm run build && cp -r frontend/dist ./public",
+  "outputDirectory": "./public",
   "devCommand": "npm run dev",
   "functions": {
     "api/**/*.ts": {
