@@ -170,6 +170,12 @@
 .vehicle-btn .vicon { font-size: 20px; }
 
 /* ── Botão calcular ── */
+.calc-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .btn-calcular {
   width: 100%;
   padding: 15px;
@@ -192,6 +198,23 @@
 }
 
 .btn-calcular:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-volta-form {
+  width: 100%;
+  padding: 13px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-volta-form:hover:not(:disabled) { background: #ea580c; transform: translateY(-1px); }
+.btn-volta-form:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Erro ── */
 .error-msg {

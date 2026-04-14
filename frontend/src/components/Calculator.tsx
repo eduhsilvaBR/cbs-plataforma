@@ -3,19 +3,39 @@ import apiClient from '../utils/api'
 import RouteMap from './RouteMap'
 import './Calculator.css'
 
+interface Coords { lat: number; lng: number }
 interface Result {
   id: number
   vehicleType: string
+  routeType: string
   distance: number
   duration: string
   basePrice: number
   tolEstimate: number
   totalPrice: number
-  routeType: string
-  isRealRoute: boolean
-  originCoords?: { lat: number; lng: number }
-  destCoords?:   { lat: number; lng: number }
-  routeCoords?:  [number, number][]
+  fuelCost: number
+}
+
+// Chama OSRM direto do browser
+async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
+  const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=true`
+  const res = await fetch(url)
+  const data = await res.json()
+  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('Sem rota')
+
+  const routes = data.routes as any[]
+  const route = type === 'shortest'
+    ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
+    : routes[0]
+
+  const distKm = Math.round(route.distance / 1000 * 10) / 10
+  const secs = route.duration
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`
+  const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+  return { distKm, duration, routeCoords }
 }
 
 export default function Calculator() {
@@ -28,31 +48,29 @@ export default function Calculator() {
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState('')
   const [result,      setResult]      = useState<Result | null>(null)
-  const [fuelCost,    setFuelCost]    = useState(0)
 
-  const [originCoords,      setOriginCoords]      = useState<{lat:number;lng:number}|undefined>()
-  const [destinationCoords, setDestinationCoords] = useState<{lat:number;lng:number}|undefined>()
-  const [routeCoords,       setRouteCoords]       = useState<[number,number][]|undefined>()
+  const [originCoords,      setOriginCoords]      = useState<Coords | undefined>()
+  const [destinationCoords, setDestinationCoords] = useState<Coords | undefined>()
+  const [routeCoords,       setRouteCoords]       = useState<[number,number][] | undefined>()
 
-  // Preview no mapa enquanto digita (debounce 900ms)
+  // Preview mapa ao digitar
   useEffect(() => {
-    if (!origin && !destination) return
     const t = setTimeout(async () => {
-      const geo = async (addr: string) => {
+      const geo = async (addr: string): Promise<Coords | undefined> => {
         if (!addr) return undefined
         try {
           const cepM = addr.match(/\d{5}-?\d{3}/)
+          let q = addr
           if (cepM) {
-            const cep = cepM[0].replace('-', '')
-            const vd = await (await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json()
-            if (!vd.erro) addr = `${vd.localidade}, ${vd.uf}, Brasil`
+            const vd = await (await fetch(`https://viacep.com.br/ws/${cepM[0].replace('-','')}}/json/`)).json()
+            if (!vd.erro) q = `${vd.localidade}, ${vd.uf}`
           }
           const r = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=br`,
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=br`,
             { headers: { 'User-Agent': 'CBS-Frete' } }
           )
           const d = await r.json()
-          if (d && d.length > 0) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }
+          if (d?.length > 0) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }
         } catch {}
         return undefined
       }
@@ -62,53 +80,78 @@ export default function Calculator() {
     return () => clearTimeout(t)
   }, [origin, destination])
 
-  const doCalculate = async (orig: string, dest: string) => {
-    setLoading(true); setError('')
+  const calcular = async (orig: string, dest: string) => {
+    if (!orig || !dest) return
+    setLoading(true); setError(''); setResult(null); setRouteCoords(undefined)
     try {
-      const res = await apiClient.post('/api/calculate', {
-        vehicleType,
-        pricePerKm: vehicleType === 'MUNK' ? 5.50 : 3.50,
-        originAddress: orig,
-        destinationAddress: dest,
-        routeType,
+      // 1. Geocodificar via API do servidor
+      const geoRes = await apiClient.post('/api/calculate', {
+        vehicleType, originAddress: orig, destinationAddress: dest
       })
-      const data: Result = res.data
-      setResult(data)
-      if (data.originCoords) setOriginCoords(data.originCoords)
-      if (data.destCoords)   setDestinationCoords(data.destCoords)
-      if (data.routeCoords)  setRouteCoords(data.routeCoords)
-      const fuel = (data.distance / parseFloat(consumption)) * parseFloat(fuelPrice)
-      setFuelCost(parseFloat(fuel.toFixed(2)))
+      const { originCoords: oCoords, destCoords: dCoords } = geoRes.data
+      setOriginCoords(oCoords)
+      setDestinationCoords(dCoords)
+
+      // 2. Rota OSRM direto do browser (sem passar pelo Vercel)
+      const { distKm, duration, routeCoords: rc } = await getOsrmRoute(oCoords, dCoords, routeType)
+      setRouteCoords(rc)
+
+      // 3. Calcular preços
+      const pricePerKm = vehicleType === 'MUNK' ? 5.50 : 3.50
+      const basePrice   = parseFloat((distKm * pricePerKm).toFixed(2))
+      const tolEstimate = parseFloat((distKm * 0.20).toFixed(2))
+      const totalPrice  = parseFloat((basePrice + tolEstimate).toFixed(2))
+      const fuelCost    = parseFloat(((distKm / parseFloat(consumption)) * parseFloat(fuelPrice)).toFixed(2))
+
+      setResult({
+        id: Math.floor(Math.random() * 100000),
+        vehicleType, routeType,
+        distance: distKm, duration,
+        basePrice, tolEstimate, totalPrice, fuelCost
+      })
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao calcular. Verifique os endereços.')
     } finally { setLoading(false) }
   }
 
-  const handleCalculate = (e: React.FormEvent) => { e.preventDefault(); doCalculate(origin, destination) }
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); calcular(origin, destination) }
 
-  // Troca origem ↔ destino e recalcula
   const handleVolta = () => {
-    const novaOrigem = destination
-    const novoDestino = origin
-    setOrigin(novaOrigem)
-    setDestination(novoDestino)
-    setOriginCoords(destinationCoords)
-    setDestinationCoords(originCoords)
-    setResult(null); setRouteCoords(undefined)
-    doCalculate(novaOrigem, novoDestino)
+    const novaOrig = destination
+    const novaDest = origin
+    setOrigin(novaOrig)
+    setDestination(novaDest)
+    calcular(novaOrig, novaDest)
   }
 
   const downloadPDF = () => {
     if (!result) return
-    const txt = `CBS TRANSPORTES NÁUTICOS\nOrçamento #${String(result.id).padStart(6,'0')}\n\nVeículo: ${result.vehicleType}\nTipo de Rota: ${routeType==='fastest'?'Mais Rápida':'Mais Curta'}\nOrigem:  ${origin}\nDestino: ${destination}\n\nDistância: ${result.distance} km\nDuração:   ${result.duration}\n\nFrete Base:       R$ ${result.basePrice.toFixed(2)}\nPedágio Est.:     R$ ${result.tolEstimate.toFixed(2)}\nCombustível:      R$ ${fuelCost.toFixed(2)}\n──────────────────────────\nTOTAL:            R$ ${(result.totalPrice+fuelCost).toFixed(2)}\n\n${new Date().toLocaleString('pt-BR')}`
+    const txt = [
+      'CBS TRANSPORTES NÁUTICOS',
+      `Orçamento #${String(result.id).padStart(6,'0')}`,
+      '',
+      `Veículo:   ${result.vehicleType}`,
+      `Rota:      ${result.routeType === 'fastest' ? 'Mais Rápida' : 'Mais Curta'}`,
+      `Origem:    ${origin}`,
+      `Destino:   ${destination}`,
+      '',
+      `Distância: ${result.distance} km`,
+      `Duração:   ${result.duration}`,
+      '',
+      `Frete Base:       R$ ${result.basePrice.toFixed(2)}`,
+      `Pedágio Est.:     R$ ${result.tolEstimate.toFixed(2)}`,
+      `Combustível:      R$ ${result.fuelCost.toFixed(2)}`,
+      '─────────────────────────────',
+      `TOTAL:            R$ ${(result.totalPrice + result.fuelCost).toFixed(2)}`,
+      '',
+      new Date().toLocaleString('pt-BR'),
+    ].join('\n')
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' })),
       download: `orcamento-cbs-${result.id}.txt`
     })
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
-
-  const resetar = () => { setResult(null); setRouteCoords(undefined) }
 
   return (
     <div className="calculator-container">
@@ -128,8 +171,7 @@ export default function Calculator() {
             <p className="card-title">Calculadora de Frete</p>
             {error && <div className="error-msg">{error}</div>}
 
-            <form onSubmit={handleCalculate}>
-              {/* Endereços */}
+            <form onSubmit={handleSubmit}>
               <div className="address-inputs">
                 <div className="address-field">
                   <span className="addr-icon">📍</span>
@@ -143,7 +185,6 @@ export default function Calculator() {
                 </div>
               </div>
 
-              {/* Combustível */}
               <div className="options-row">
                 <div className="option-input">
                   <label>Combustível (R$)</label>
@@ -157,19 +198,13 @@ export default function Calculator() {
                 </div>
               </div>
 
-              {/* Veículo */}
               <div className="vehicle-row">
                 <button type="button" className={`vehicle-btn ${vehicleType==='MUNK'?'active':''}`}
-                  onClick={() => setVehicleType('MUNK')}>
-                  <span className="vicon">🏗️</span> MUNK
-                </button>
+                  onClick={() => setVehicleType('MUNK')}><span className="vicon">🏗️</span> MUNK</button>
                 <button type="button" className={`vehicle-btn ${vehicleType==='PRANCHA'?'active':''}`}
-                  onClick={() => setVehicleType('PRANCHA')}>
-                  <span className="vicon">🚛</span> PRANCHA
-                </button>
+                  onClick={() => setVehicleType('PRANCHA')}><span className="vicon">🚛</span> PRANCHA</button>
               </div>
 
-              {/* Tipo de rota */}
               <div className="vehicle-row">
                 <button type="button" className={`vehicle-btn route-btn ${routeType==='fastest'?'active':''}`}
                   onClick={() => setRouteType('fastest')}>⚡ Mais Rápida</button>
@@ -177,9 +212,15 @@ export default function Calculator() {
                   onClick={() => setRouteType('shortest')}>📏 Mais Curta</button>
               </div>
 
-              <button type="submit" className="btn-calcular" disabled={loading}>
-                {loading ? '⏳ Calculando rota...' : '🚚 Calcular Frete'}
-              </button>
+              <div className="calc-buttons">
+                <button type="submit" className="btn-calcular" disabled={loading}>
+                  {loading ? '⏳ Calculando...' : '🚚 Calcular Frete'}
+                </button>
+                <button type="button" className="btn-volta-form" disabled={loading || !origin || !destination}
+                  onClick={handleVolta}>
+                  🔄 Calcular Volta
+                </button>
+              </div>
             </form>
           </>
         ) : (
@@ -190,45 +231,25 @@ export default function Calculator() {
             </div>
 
             <div className="result-rows">
-              <div className="result-row">
-                <span className="rl">Veículo</span>
-                <span className="rv">{result.vehicleType}</span>
-              </div>
-              <div className="result-row">
-                <span className="rl">Rota</span>
-                <span className="rv">{routeType==='fastest'?'⚡ Mais Rápida':'📏 Mais Curta'}</span>
-              </div>
-              <div className="result-row">
-                <span className="rl">Origem</span>
-                <span className="rv small">{origin}</span>
-              </div>
-              <div className="result-row">
-                <span className="rl">Destino</span>
-                <span className="rv small">{destination}</span>
-              </div>
-              <div className="result-row">
-                <span className="rl">Distância</span>
-                <span className="rv">{result.distance} km</span>
-              </div>
-              <div className="result-row">
-                <span className="rl">Duração</span>
-                <span className="rv">{result.duration}</span>
-              </div>
+              <div className="result-row"><span className="rl">Veículo</span><span className="rv">{result.vehicleType}</span></div>
+              <div className="result-row"><span className="rl">Rota</span><span className="rv">{result.routeType==='fastest'?'⚡ Mais Rápida':'📏 Mais Curta'}</span></div>
+              <div className="result-row"><span className="rl">Origem</span><span className="rv small">{origin}</span></div>
+              <div className="result-row"><span className="rl">Destino</span><span className="rv small">{destination}</span></div>
+              <div className="result-row"><span className="rl">Distância</span><span className="rv">{result.distance} km</span></div>
+              <div className="result-row"><span className="rl">Duração</span><span className="rv">{result.duration}</span></div>
             </div>
 
             <div className="summary-box">
               <div className="summary-line"><span>Frete Base</span><span>R$ {result.basePrice.toFixed(2)}</span></div>
               <div className="summary-line"><span>Pedágio Estimado</span><span>R$ {result.tolEstimate.toFixed(2)}</span></div>
-              <div className="summary-line"><span>Combustível</span><span>R$ {fuelCost.toFixed(2)}</span></div>
-              <div className="summary-total"><span>TOTAL</span><span>R$ {(result.totalPrice+fuelCost).toFixed(2)}</span></div>
+              <div className="summary-line"><span>Combustível</span><span>R$ {result.fuelCost.toFixed(2)}</span></div>
+              <div className="summary-total"><span>TOTAL</span><span>R$ {(result.totalPrice + result.fuelCost).toFixed(2)}</span></div>
             </div>
 
             <div className="action-btns">
               <button className="btn-pdf" onClick={downloadPDF}>📄 Baixar PDF</button>
-              <button className="btn-novo" onClick={resetar}>← Novo Cálculo</button>
+              <button className="btn-novo" onClick={() => { setResult(null); setRouteCoords(undefined) }}>← Novo Cálculo</button>
             </div>
-
-            {/* Botão Calcular Volta */}
             <button className="btn-volta" onClick={handleVolta} disabled={loading}>
               {loading ? '⏳ Calculando...' : '🔄 Calcular Volta'}
             </button>
