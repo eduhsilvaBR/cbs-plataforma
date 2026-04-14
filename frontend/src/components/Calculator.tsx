@@ -39,19 +39,21 @@ export default function Calculator({ token }: CalculatorProps) {
 
   const geocodeAddress = async (address: string): Promise<Coordinates | null> => {
     try {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      if (!apiKey) return null
-
-      const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+      // Usar Nominatim (OpenStreetMap) - completamente gratuito
+      const response = await axios.get('https://nominatim.openstreetmap.org/search', {
         params: {
-          address,
-          key: apiKey,
+          q: address,
+          format: 'json',
+          limit: 1,
+        },
+        headers: {
+          'User-Agent': 'CBS-Frete-Calculator',
         },
       })
 
-      if (response.data.results && response.data.results.length > 0) {
-        const { lat, lng } = response.data.results[0].geometry.location
-        return { lat, lng }
+      if (response.data && response.data.length > 0) {
+        const { lat, lon } = response.data[0]
+        return { lat: parseFloat(lat), lng: parseFloat(lon) }
       }
       return null
     } catch (err) {
