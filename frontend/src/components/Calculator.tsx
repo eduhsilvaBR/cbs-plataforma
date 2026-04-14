@@ -26,6 +26,8 @@ interface CalculatorProps {
 export default function Calculator({ token }: CalculatorProps) {
   const [vehicleType, setVehicleType] = useState<'MUNK' | 'PRANCHA'>('MUNK')
   const [pricePerKm, setPricePerKm] = useState('5.50')
+  const [fuelPrice, setFuelPrice] = useState('6.50')
+  const [consumption, setConsumption] = useState('8')
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,6 +35,7 @@ export default function Calculator({ token }: CalculatorProps) {
   const [result, setResult] = useState<Budget | null>(null)
   const [originCoords, setOriginCoords] = useState<Coordinates | null>(null)
   const [destinationCoords, setDestinationCoords] = useState<Coordinates | null>(null)
+  const [fuelCost, setFuelCost] = useState(0)
 
   const geocodeAddress = async (address: string): Promise<Coordinates | null> => {
     try {
@@ -100,6 +103,12 @@ export default function Calculator({ token }: CalculatorProps) {
       })
 
       setResult(response.data)
+
+      // Calcular custo de combustível
+      const distance = response.data.distance
+      const fuel = parseFloat(fuelPrice) / parseFloat(consumption)
+      const totalFuel = distance * fuel
+      setFuelCost(totalFuel)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao calcular frete. Verifique os endereços.')
     } finally {
@@ -189,6 +198,37 @@ export default function Calculator({ token }: CalculatorProps) {
               </div>
 
               <div className="form-section">
+                <h3>Combustível</h3>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Combustível (R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={fuelPrice}
+                      onChange={(e) => setFuelPrice(e.target.value)}
+                      placeholder="Ex: 6.50"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Consumo (km/l) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={consumption}
+                      onChange={(e) => setConsumption(e.target.value)}
+                      placeholder="Ex: 8"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
                 <h3>Endereços</h3>
 
                 <div className="form-group">
@@ -274,9 +314,15 @@ export default function Calculator({ token }: CalculatorProps) {
                         <span>R$ {result.tolEstimate.toFixed(2)}</span>
                       </div>
                     )}
+                    {fuelCost > 0 && (
+                      <div className="summary-row">
+                        <span>Custo de Combustível</span>
+                        <span>R$ {fuelCost.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="summary-row total">
                       <span>TOTAL</span>
-                      <span>R$ {result.totalPrice.toFixed(2)}</span>
+                      <span>R$ {(result.totalPrice + fuelCost).toFixed(2)}</span>
                     </div>
                   </div>
 
