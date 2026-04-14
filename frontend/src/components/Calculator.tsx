@@ -34,9 +34,11 @@ async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'sho
   const alt = type === 'shortest'
 
   // Tenta servidores em ordem de preferência
+  // routed-hgv = Heavy Goods Vehicle (caminhão) — mais preciso para fretes
   const servers = [
-    'https://routing.openstreetmap.de/routed-car',
     'https://router.project-osrm.org',
+    'https://routing.openstreetmap.de/routed-hgv',
+    'https://routing.openstreetmap.de/routed-car',
   ]
 
   let routes: any[] | null = null
