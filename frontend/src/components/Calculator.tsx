@@ -20,10 +20,9 @@ interface Result {
 // ── OSRM car profile ───────────────────────────────────────────────────────
 // Usa perfil de carro (segue BR-101 costeira como apps de referência)
 // Para "shortest": pede até 3 alternativas e escolhe menor distância
-async function tryOsrm(server: string, coords: string, numAlt: number) {
+async function tryOsrm(server: string, coords: string, alternatives: boolean) {
   try {
-    const altParam = numAlt > 1 ? numAlt : 'false'
-    const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${altParam}&steps=false`
+    const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alternatives}&steps=false`
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
     const data = await res.json()
     if (data.code === 'Ok' && data.routes?.length) return data.routes as any[]
@@ -32,8 +31,8 @@ async function tryOsrm(server: string, coords: string, numAlt: number) {
 }
 
 async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
-  const coords  = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
-  const numAlt  = type === 'shortest' ? 3 : 1
+  const coords       = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const alternatives = type === 'shortest'
   const servers = [
     'https://router.project-osrm.org',
     'https://routing.openstreetmap.de/routed-car',
@@ -41,7 +40,7 @@ async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortes
 
   let routes: any[] | null = null
   for (const server of servers) {
-    routes = await tryOsrm(server, coords, numAlt)
+    routes = await tryOsrm(server, coords, alternatives)
     if (routes) break
   }
   if (!routes) throw new Error('Nenhum servidor de rota disponível')
