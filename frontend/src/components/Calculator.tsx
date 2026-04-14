@@ -189,7 +189,7 @@ export default function Calculator() {
     const novaDest = origin
     setOrigin(novaOrig)
     setDestination(novaDest)
-    // keepResult=true: mantém na tela de resultado enquanto recalcula
+    setRouteCoords(undefined) // limpa rota anterior para forçar redesenho
     calcular(novaOrig, novaDest, true)
   }
 
@@ -406,6 +406,8 @@ export default function Calculator() {
               <img src="/logo cbs.png" alt="CBS" />
               <h2>{loading ? '⏳ Recalculando...' : 'Resultado'}</h2>
             </div>
+
+            {error && <div className="error-msg">{error}</div>}
 
             <div className="result-rows">
               <div className="result-row"><span className="rl">Veículo</span><span className="rv">{result.vehicleType}</span></div>
