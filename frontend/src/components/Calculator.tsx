@@ -105,6 +105,14 @@ export default function Calculator({ token }: CalculatorProps) {
 
       setResult(response.data)
 
+      // Atualizar coordenadas do mapa com os dados da API
+      if (response.data.originCoords) {
+        setOriginCoords(response.data.originCoords)
+      }
+      if (response.data.destCoords) {
+        setDestinationCoords(response.data.destCoords)
+      }
+
       // Calcular custo de combustível
       const distance = response.data.distance
       const fuel = parseFloat(fuelPrice) / parseFloat(consumption)

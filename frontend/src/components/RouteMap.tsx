@@ -79,9 +79,10 @@ export default function RouteMap({ origin, destination, originAddress, destinati
       polylineRef.current = L.polyline(
         [[origin.lat, origin.lng], [destination.lat, destination.lng]],
         {
-          color: '#ff9800',
-          weight: 4,
-          opacity: 0.9,
+          color: '#e63946',
+          weight: 5,
+          opacity: 0.95,
+          dashArray: '0',
         }
       ).addTo(map.current)
 
