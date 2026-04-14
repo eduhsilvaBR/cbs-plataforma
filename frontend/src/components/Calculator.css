@@ -315,6 +315,26 @@
 
 .btn-novo:hover { background: #15803d; transform: translateY(-1px); }
 
+.btn-volta {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.btn-volta:hover:not(:disabled) { background: #ea580c; transform: translateY(-1px); }
+.btn-volta:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.route-btn { font-size: 13px; }
+
 /* ── Scrollbar no card ── */
 .floating-card::-webkit-scrollbar { width: 5px; }
 .floating-card::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
