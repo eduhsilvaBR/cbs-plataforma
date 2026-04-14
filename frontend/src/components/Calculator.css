@@ -76,6 +76,21 @@
   grid-column: 1;
 }
 
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e8e8e8;
+}
+
+.result-logo {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
 .calculator-card h2,
 .result-card h2 {
   font-size: 26px;
@@ -83,6 +98,10 @@
   color: #1a1a1a;
   font-weight: 800;
   letter-spacing: -0.4px;
+}
+
+.result-header h2 {
+  margin-bottom: 0;
 }
 
 .subtitle {

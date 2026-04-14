@@ -270,7 +270,10 @@ export default function Calculator({ token }: CalculatorProps) {
             </>
           ) : (
             <>
-              <h2>Resultado do Orçamento</h2>
+              <div className="result-header">
+                <img src="/logo cbs.png" alt="CBS Logo" className="result-logo" />
+                <h2>Resultado do Orçamento</h2>
+              </div>
 
               <div className="result-info">
                   <div className="info-row">
