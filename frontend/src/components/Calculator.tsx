@@ -17,9 +17,24 @@ interface Result {
   fuelCost: number
 }
 
-// ── Valhalla auto (carro) ──────────────────────────────────────────────────
-// Perfil "auto" não penaliza serras/curvas → pega rotas costeiras (BR-101)
-// shortest:true/false → rotas genuinamente diferentes
+// ── Decoder: Valhalla usa encoded polyline com precisão 6 ─────────────────
+function decodePolyline6(encoded: string): [number, number][] {
+  const coords: [number, number][] = []
+  let idx = 0, lat = 0, lng = 0
+  while (idx < encoded.length) {
+    let b, shift = 0, result = 0
+    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1)
+    shift = 0; result = 0
+    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1)
+    coords.push([lat / 1e6, lng / 1e6]) // já em [lat, lng] para Leaflet
+  }
+  return coords
+}
+
+// ── Valhalla auto ──────────────────────────────────────────────────────────
+// Perfil "auto" segue rotas costeiras (BR-101) sem penalizar serras
 async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
   try {
     const body = {
@@ -29,7 +44,6 @@ async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
       ],
       costing: 'auto',
       directions_type: 'none',
-      shape_format: 'geojson',
       costing_options: { auto: { shortest } },
     }
     const res = await fetch('https://valhalla1.openstreetmap.de/route', {
@@ -41,13 +55,12 @@ async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
     if (!res.ok) return null
     const data = await res.json()
     const leg = data?.trip?.legs?.[0]
-    if (!leg) return null
+    if (!leg?.shape || typeof leg.shape !== 'string') return null
     const distKm      = Math.round(leg.summary.length * 10) / 10
     const secs        = leg.summary.time
-    const routeCoords: [number, number][] = leg.shape.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+    const routeCoords = decodePolyline6(leg.shape)
     return { distKm, secs, routeCoords }
-  } catch {}
-  return null
+  } catch { return null }
 }
 
 // ── OSRM (fallback) ────────────────────────────────────────────────────────
