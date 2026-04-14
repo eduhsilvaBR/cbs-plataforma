@@ -1,9 +1,6 @@
 {
   "buildCommand": "npm install && cd api && npm install && cd ../frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "env": {
-    "VITE_API_URL": "@api_url"
-  },
   "devCommand": "npm run dev",
   "functions": {
     "api/**/*.ts": {
