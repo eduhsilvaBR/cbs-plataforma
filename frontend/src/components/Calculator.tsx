@@ -17,9 +17,40 @@ interface Result {
   fuelCost: number
 }
 
-// ── OSRM car profile ───────────────────────────────────────────────────────
-// Usa perfil de carro (segue BR-101 costeira como apps de referência)
-// Para "shortest": pede até 3 alternativas e escolhe menor distância
+// ── Valhalla auto (carro) ──────────────────────────────────────────────────
+// Perfil "auto" não penaliza serras/curvas → pega rotas costeiras (BR-101)
+// shortest:true/false → rotas genuinamente diferentes
+async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
+  try {
+    const body = {
+      locations: [
+        { lon: origin.lng, lat: origin.lat },
+        { lon: dest.lng,   lat: dest.lat   },
+      ],
+      costing: 'auto',
+      directions_type: 'none',
+      shape_format: 'geojson',
+      costing_options: { auto: { shortest } },
+    }
+    const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const leg = data?.trip?.legs?.[0]
+    if (!leg) return null
+    const distKm      = Math.round(leg.summary.length * 10) / 10
+    const secs        = leg.summary.time
+    const routeCoords: [number, number][] = leg.shape.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+    return { distKm, secs, routeCoords }
+  } catch {}
+  return null
+}
+
+// ── OSRM (fallback) ────────────────────────────────────────────────────────
 async function tryOsrm(server: string, coords: string, alternatives: boolean) {
   try {
     const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alternatives}&steps=false`
@@ -31,33 +62,36 @@ async function tryOsrm(server: string, coords: string, alternatives: boolean) {
 }
 
 async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
-  const coords       = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
-  const alternatives = type === 'shortest'
-  const servers = [
-    'https://router.project-osrm.org',
-    'https://routing.openstreetmap.de/routed-car',
-  ]
+  const shortest = type === 'shortest'
 
+  // Tenta Valhalla auto (carro) — melhor para rotas costeiras
+  const vResult = await tryValhalla(origin, dest, shortest)
+  if (vResult) {
+    const { distKm, secs, routeCoords } = vResult
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    return { distKm, duration: h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`, routeCoords }
+  }
+
+  // Fallback: OSRM
+  const coords  = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
   let routes: any[] | null = null
   for (const server of servers) {
-    routes = await tryOsrm(server, coords, alternatives)
+    routes = await tryOsrm(server, coords, shortest)
     if (routes) break
   }
   if (!routes) throw new Error('Nenhum servidor de rota disponível')
 
-  // fastest → routes[0] (já ordenado por tempo)
-  // shortest → escolhe menor distância entre as alternativas
-  const route = type === 'shortest'
+  const route = shortest
     ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
     : routes[0]
-
   const distKm = Math.round(route.distance / 1000 * 10) / 10
   const secs   = route.duration
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
-  const duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`
   const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
-  return { distKm, duration, routeCoords }
+  return { distKm, duration: h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`, routeCoords }
 }
 
 export default function Calculator() {
