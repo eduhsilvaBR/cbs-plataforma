@@ -17,77 +17,47 @@ interface Result {
   fuelCost: number
 }
 
-// ── Valhalla (motor de rotas OSM Germany) ──────────────────────────────────
-// Suporta "truck" + shortest:true/false → rotas genuinamente diferentes
-async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
+// ── OSRM car profile ───────────────────────────────────────────────────────
+// Usa perfil de carro (segue BR-101 costeira como apps de referência)
+// Para "shortest": pede até 3 alternativas e escolhe menor distância
+async function tryOsrm(server: string, coords: string, numAlt: number) {
   try {
-    const body = {
-      locations: [
-        { lon: origin.lng, lat: origin.lat },
-        { lon: dest.lng,   lat: dest.lat   },
-      ],
-      costing: 'truck',
-      directions_type: 'none',
-      shape_format: 'geojson',
-      costing_options: { truck: { shortest } },
-    }
-    const res = await fetch('https://valhalla1.openstreetmap.de/route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10000),
-    })
-    const data = await res.json()
-    const leg = data?.trip?.legs?.[0]
-    if (!leg) return null
-    const distKm = Math.round(leg.summary.length * 10) / 10
-    const secs   = leg.summary.time
-    const routeCoords: [number, number][] = leg.shape.coordinates.map(([lng, lat]: number[]) => [lat, lng])
-    return { distKm, secs, routeCoords }
-  } catch {}
-  return null
-}
-
-// ── OSRM (fallback) ────────────────────────────────────────────────────────
-async function tryOsrm(server: string, coords: string, alt: boolean) {
-  try {
-    const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alt}&steps=false`
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const altParam = numAlt > 1 ? numAlt : 'false'
+    const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${altParam}&steps=false`
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
     const data = await res.json()
     if (data.code === 'Ok' && data.routes?.length) return data.routes as any[]
   } catch {}
   return null
 }
 
-async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
-  const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
-  const alt = type === 'shortest'
-  const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
+async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
+  const coords  = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const numAlt  = type === 'shortest' ? 3 : 1
+  const servers = [
+    'https://router.project-osrm.org',
+    'https://routing.openstreetmap.de/routed-car',
+  ]
+
   let routes: any[] | null = null
   for (const server of servers) {
-    routes = await tryOsrm(server, coords, alt)
+    routes = await tryOsrm(server, coords, numAlt)
     if (routes) break
   }
   if (!routes) throw new Error('Nenhum servidor de rota disponível')
+
+  // fastest → routes[0] (já ordenado por tempo)
+  // shortest → escolhe menor distância entre as alternativas
   const route = type === 'shortest'
     ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
     : routes[0]
+
   const distKm = Math.round(route.distance / 1000 * 10) / 10
   const secs   = route.duration
-  const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
-  return { distKm, secs, routeCoords }
-}
-
-// ── Roteamento principal: Valhalla → OSRM fallback ─────────────────────────
-async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
-  const shortest = type === 'shortest'
-  let result = await tryValhalla(origin, dest, shortest)
-  if (!result) result = await getOsrmRoute(origin, dest, type)
-  if (!result) throw new Error('Nenhum servidor de rota disponível')
-  const { distKm, secs, routeCoords } = result
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   const duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`
+  const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
   return { distKm, duration, routeCoords }
 }
 
