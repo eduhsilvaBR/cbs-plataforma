@@ -80,11 +80,11 @@ export default function Calculator() {
     return () => clearTimeout(t)
   }, [origin, destination])
 
-  const calcular = async (orig: string, dest: string) => {
+  const calcular = async (orig: string, dest: string, keepResult = false) => {
     if (!orig || !dest) return
-    setLoading(true); setError(''); setResult(null); setRouteCoords(undefined)
+    setLoading(true); setError('')
+    if (!keepResult) { setResult(null); setRouteCoords(undefined) }
     try {
-      // 1. Geocodificar via API do servidor
       const geoRes = await apiClient.post('/api/calculate', {
         vehicleType, originAddress: orig, destinationAddress: dest
       })
@@ -92,14 +92,13 @@ export default function Calculator() {
       setOriginCoords(oCoords)
       setDestinationCoords(dCoords)
 
-      // 2. Rota OSRM direto do browser (sem passar pelo Vercel)
       const { distKm, duration, routeCoords: rc } = await getOsrmRoute(oCoords, dCoords, routeType)
       setRouteCoords(rc)
 
-      // 3. Calcular preços
-      const pricePerKm = vehicleType === 'MUNK' ? 5.50 : 3.50
+      const pricePerKm  = vehicleType === 'MUNK' ? 5.50 : 3.50
       const basePrice   = parseFloat((distKm * pricePerKm).toFixed(2))
-      const tolEstimate = parseFloat((distKm * 0.20).toFixed(2))
+      // Pedágio: ~R$0.12/km (média nacional) — apenas estimativa
+      const tolEstimate = parseFloat((distKm * 0.12).toFixed(2))
       const totalPrice  = parseFloat((basePrice + tolEstimate).toFixed(2))
       const fuelCost    = parseFloat(((distKm / parseFloat(consumption)) * parseFloat(fuelPrice)).toFixed(2))
 
@@ -121,7 +120,8 @@ export default function Calculator() {
     const novaDest = origin
     setOrigin(novaOrig)
     setDestination(novaDest)
-    calcular(novaOrig, novaDest)
+    // keepResult=true: mantém na tela de resultado enquanto recalcula
+    calcular(novaOrig, novaDest, true)
   }
 
   const downloadPDF = () => {
@@ -227,7 +227,7 @@ export default function Calculator() {
           <>
             <div className="result-logo-header">
               <img src="/logo cbs.png" alt="CBS" />
-              <h2>Resultado</h2>
+              <h2>{loading ? '⏳ Recalculando...' : 'Resultado'}</h2>
             </div>
 
             <div className="result-rows">
@@ -241,10 +241,14 @@ export default function Calculator() {
 
             <div className="summary-box">
               <div className="summary-line"><span>Frete Base</span><span>R$ {result.basePrice.toFixed(2)}</span></div>
-              <div className="summary-line"><span>Pedágio Estimado</span><span>R$ {result.tolEstimate.toFixed(2)}</span></div>
+              <div className="summary-line">
+                <span>Pedágio <small className="note">est.</small></span>
+                <span>R$ {result.tolEstimate.toFixed(2)}</span>
+              </div>
               <div className="summary-line"><span>Combustível</span><span>R$ {result.fuelCost.toFixed(2)}</span></div>
               <div className="summary-total"><span>TOTAL</span><span>R$ {(result.totalPrice + result.fuelCost).toFixed(2)}</span></div>
             </div>
+            <p className="toll-note">* Pedágio estimado em R$0,12/km. Valor real pode variar.</p>
 
             <div className="action-btns">
               <button className="btn-pdf" onClick={downloadPDF}>📄 Baixar PDF</button>

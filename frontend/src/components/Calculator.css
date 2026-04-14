@@ -300,6 +300,20 @@
 
 .summary-total span { color: #d97706; }
 
+.toll-note {
+  font-size: 11px;
+  color: #999;
+  margin-top: -8px;
+  margin-bottom: 14px;
+  font-style: italic;
+}
+
+.note {
+  font-size: 10px;
+  color: #aaa;
+  font-weight: normal;
+}
+
 /* Botões de ação */
 .action-btns {
   display: grid;
