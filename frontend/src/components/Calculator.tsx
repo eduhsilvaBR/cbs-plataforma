@@ -18,6 +18,7 @@ interface Result {
 
 export default function Calculator() {
   const [vehicleType, setVehicleType]   = useState<'MUNK' | 'PRANCHA'>('MUNK')
+  const [routeType, setRouteType]       = useState<'fastest' | 'shortest'>('fastest')
   const [pricePerKm, setPricePerKm]     = useState('5.50')
   const [fuelPrice, setFuelPrice]       = useState('6.50')
   const [consumption, setConsumption]   = useState('8')
@@ -63,6 +64,7 @@ export default function Calculator() {
         pricePerKm: parseFloat(pricePerKm),
         originAddress: origin,
         destinationAddress: destination,
+        routeType,
       })
       const data: Result = res.data
       setResult(data)
@@ -204,6 +206,16 @@ Gerado em: ${new Date().toLocaleString('pt-BR')}
                 </button>
               </div>
 
+              {/* Tipo de rota */}
+              <div className="vehicle-row">
+                <button type="button" className={`vehicle-btn ${routeType==='fastest'?'active':''}`} onClick={() => setRouteType('fastest')}>
+                  ⚡ Mais Rápida
+                </button>
+                <button type="button" className={`vehicle-btn ${routeType==='shortest'?'active':''}`} onClick={() => setRouteType('shortest')}>
+                  📏 Mais Curta
+                </button>
+              </div>
+
               <button type="submit" className="btn-calcular" disabled={loading}>
                 {loading ? '⏳ Calculando rota...' : '🚚 Calcular Frete'}
               </button>
@@ -235,6 +247,10 @@ Gerado em: ${new Date().toLocaleString('pt-BR')}
               <div className="result-row">
                 <span className="rl">Destino</span>
                 <span className="rv small">{destination}</span>
+              </div>
+              <div className="result-row">
+                <span className="rl">Tipo de Rota</span>
+                <span className="rv">{routeType === 'fastest' ? '⚡ Mais Rápida' : '📏 Mais Curta'}</span>
               </div>
               <div className="result-row">
                 <span className="rl">Distância</span>

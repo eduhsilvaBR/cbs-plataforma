@@ -3,106 +3,114 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
-
-  const { vehicleType, pricePerKm, originAddress, destinationAddress } = req.body;
-
-  if (!vehicleType || !pricePerKm || !originAddress || !destinationAddress) {
+  const { vehicleType, pricePerKm, originAddress, destinationAddress, routeType = 'fastest' } = req.body;
+  if (!vehicleType || !pricePerKm || !originAddress || !destinationAddress)
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
-  }
 
   try {
-    // 1. Geocodificar - múltiplas tentativas para endereços BR
+    // ── Geocodificação robusta para endereços brasileiros ──
     const geocode = async (address) => {
       const nom = async (q) => {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=br`;
-        const r = await fetch(url, { headers: { 'User-Agent': 'CBS-Frete-Calculator/1.0' } });
-        const data = await r.json();
-        if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        const r = await fetch(url, { headers: { 'User-Agent': 'CBS-Frete/1.0 (contato@cbs.com)' } });
+        const d = await r.json();
+        if (d && d.length > 0) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
         return null;
       };
 
-      // Tentativa 1: endereço completo
-      let result = await nom(address);
-      if (result) return result;
+      // 1) endereço completo
+      let c = await nom(address);
+      if (c) return c;
 
-      // Tentativa 2: extrair CEP e buscar pela cidade/estado
-      const cepMatch = address.match(/\d{5}-?\d{3}/);
-      if (cepMatch) {
+      // 2) via CEP (ViaCEP)
+      const cepM = address.match(/\d{5}-?\d{3}/);
+      if (cepM) {
         try {
-          const cep = cepMatch[0].replace('-', '');
+          const cep = cepM[0].replace('-', '');
           const vr = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
           const vd = await vr.json();
           if (!vd.erro) {
-            const simplificado = `${vd.bairro || ''}, ${vd.localidade}, ${vd.uf}, Brasil`;
-            result = await nom(simplificado);
-            if (result) return result;
-            result = await nom(`${vd.localidade}, ${vd.uf}, Brasil`);
-            if (result) return result;
+            c = await nom(`${vd.bairro}, ${vd.localidade}, ${vd.uf}`);
+            if (c) return c;
+            c = await nom(`${vd.localidade}, ${vd.uf}, Brasil`);
+            if (c) return c;
           }
         } catch {}
       }
 
-      // Tentativa 3: remover número e CEP, manter rua + cidade
-      const semNumero = address
-        .replace(/,?\s*\d{5}-?\d{3}/, '')  // remove CEP
-        .replace(/,\s*\d+\s*-/, ',')        // remove número
+      // 3) remover número e CEP
+      const limpo = address
+        .replace(/,?\s*\d{5}-?\d{3}/, '')
+        .replace(/,\s*\d+\s*-/, ',')
         .trim();
-      result = await nom(semNumero);
-      if (result) return result;
+      c = await nom(limpo);
+      if (c) return c;
 
-      // Tentativa 4: pegar só "Cidade - UF" ou "Cidade, UF"
-      const cidadeMatch = address.match(/([A-Za-zÀ-ÿ\s]+)\s*[-,]\s*(SP|RJ|MG|BA|PR|RS|SC|GO|ES|CE|PE|AM|PA|MT|MS|RO|AC|RR|AP|TO|MA|PI|RN|PB|AL|SE|DF)/i);
-      if (cidadeMatch) {
-        result = await nom(`${cidadeMatch[1].trim()}, ${cidadeMatch[2]}, Brasil`);
-        if (result) return result;
+      // 4) só cidade + UF
+      const m = address.match(/([A-Za-zÀ-ÿ\s]+)\s*[-,]\s*(SP|RJ|MG|BA|PR|RS|SC|GO|ES|CE|PE|AM|PA|MT|MS|RO|AC|RR|AP|TO|MA|PI|RN|PB|AL|SE|DF)/i);
+      if (m) {
+        c = await nom(`${m[1].trim()}, ${m[2]}, Brasil`);
+        if (c) return c;
       }
 
       return null;
     };
 
-    const [origin, dest] = await Promise.all([
-      geocode(originAddress),
-      geocode(destinationAddress)
-    ]);
+    const [origin, dest] = await Promise.all([geocode(originAddress), geocode(destinationAddress)]);
 
-    if (!origin && !dest) {
-      return res.status(400).json({ error: 'Nenhum endereço encontrado. Tente: "Guarujá, SP" ou "Salvador, BA"' });
-    }
-    if (!origin) {
-      return res.status(400).json({ error: `Origem não encontrada: "${originAddress}". Tente incluir cidade e estado.` });
-    }
-    if (!dest) {
-      return res.status(400).json({ error: `Destino não encontrado: "${destinationAddress}". Tente incluir cidade e estado.` });
-    }
+    if (!origin) return res.status(400).json({ error: `Origem não encontrada: "${originAddress}". Tente incluir cidade e estado, ex: "Guarujá, SP"` });
+    if (!dest)   return res.status(400).json({ error: `Destino não encontrado: "${destinationAddress}". Tente incluir cidade e estado, ex: "Salvador, BA"` });
 
-    // 2. Calcular rota real via OSRM (gratuito, usa OpenStreetMap)
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
-    const osrmRes = await fetch(osrmUrl);
-    const osrmData = await osrmRes.json();
+    // ── Rota via OSRM com alternativas ──
+    const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`;
+    // alternatives=true retorna até 3 rotas; a [0] é mais rápida, outros têm distância diferente
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=true&steps=false`;
 
     let distance, duration, routeCoords;
-    if (osrmData.code === 'Ok' && osrmData.routes.length > 0) {
-      const route = osrmData.routes[0];
-      distance = Math.round(route.distance / 1000 * 10) / 10; // metros → km
-      const secs = route.duration;
-      const h = Math.floor(secs / 3600);
-      const m = Math.floor((secs % 3600) / 60);
-      duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`;
-      routeCoords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-    } else {
+
+    try {
+      const osrmRes = await fetch(osrmUrl, {
+        headers: { 'User-Agent': 'CBS-Frete/1.0' },
+        signal: AbortSignal.timeout(8000)
+      });
+      const osrmData = await osrmRes.json();
+
+      if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
+        // routeType: 'fastest' → menor tempo (routes[0])
+        //            'shortest' → menor distância (ordenar por distance)
+        let routes = osrmData.routes;
+        let route;
+        if (routeType === 'shortest') {
+          route = routes.slice().sort((a, b) => a.distance - b.distance)[0];
+        } else {
+          route = routes[0]; // OSRM já retorna por menor tempo primeiro
+        }
+
+        distance    = Math.round(route.distance / 1000 * 10) / 10;
+        const secs  = route.duration;
+        const h     = Math.floor(secs / 3600);
+        const m     = Math.floor((secs % 3600) / 60);
+        duration    = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`;
+        routeCoords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+      } else {
+        throw new Error('OSRM sem rota');
+      }
+    } catch (osrmErr) {
+      console.error('OSRM error:', osrmErr.message);
       // Fallback Haversine
       const R = 6371;
       const dLat = (dest.lat - origin.lat) * Math.PI / 180;
       const dLng = (dest.lng - origin.lng) * Math.PI / 180;
       const a = Math.sin(dLat/2)**2 + Math.cos(origin.lat*Math.PI/180)*Math.cos(dest.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-      distance = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
-      duration = Math.ceil(distance / 80) + 'h';
+      const distLinha = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+      // Estimar distância por estrada (~1.3x linha reta no Brasil)
+      distance    = Math.round(distLinha * 1.3 * 10) / 10;
+      const h     = Math.floor(distance / 80);
+      const m     = Math.floor((distance % 80) / 80 * 60);
+      duration    = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`;
       routeCoords = [[origin.lat, origin.lng], [dest.lat, dest.lng]];
     }
 
@@ -112,20 +120,16 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       id: Math.floor(Math.random() * 100000),
-      vehicleType,
-      distance,
-      duration,
-      basePrice,
-      tolEstimate,
-      totalPrice,
+      vehicleType, routeType, distance, duration,
+      basePrice, tolEstimate, totalPrice,
       originCoords:  { lat: origin.lat, lng: origin.lng },
       destCoords:    { lat: dest.lat,   lng: dest.lng },
-      routeCoords,   // array de [lat,lng] da rota real
+      routeCoords,
       createdAt: new Date().toISOString()
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('Handler error:', err);
     return res.status(500).json({ error: 'Erro interno ao calcular rota' });
   }
 }
