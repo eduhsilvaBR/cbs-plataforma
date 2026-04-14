@@ -17,26 +17,42 @@ interface Result {
   fuelCost: number
 }
 
+// Tenta um servidor OSRM e retorna resultado ou null
+async function tryOsrm(server: string, coords: string, alt: boolean) {
+  try {
+    const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alt}&steps=false`
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const data = await res.json()
+    if (data.code === 'Ok' && data.routes?.length) return data.routes as any[]
+  } catch {}
+  return null
+}
+
 // Chama OSRM direto do browser
 async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
   const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const alt = type === 'shortest'
 
-  // fastest → sem alternativas (rota principal do OSRM = menor tempo)
-  // shortest → pede alternativas e pega a de menor distância
-  const alt = type === 'shortest' ? 'true' : 'false'
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alt}&steps=false`
+  // Tenta servidores em ordem de preferência
+  const servers = [
+    'https://routing.openstreetmap.de/routed-car',
+    'https://router.project-osrm.org',
+  ]
 
-  const res = await fetch(url)
-  const data = await res.json()
-  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('Sem rota')
+  let routes: any[] | null = null
+  for (const server of servers) {
+    routes = await tryOsrm(server, coords, alt)
+    if (routes) break
+  }
 
-  const routes = data.routes as any[]
+  if (!routes) throw new Error('Nenhum servidor de rota disponível')
+
   const route = type === 'shortest'
     ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
-    : routes[0]  // sempre o primeiro = mais rápida
+    : routes[0]
 
   const distKm = Math.round(route.distance / 1000 * 10) / 10
-  const secs = route.duration
+  const secs   = route.duration
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   const duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`
