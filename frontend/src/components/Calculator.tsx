@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import RouteMap from './RouteMap'
 import './Calculator.css'
@@ -62,17 +62,35 @@ export default function Calculator({ token }: CalculatorProps) {
     }
   }
 
+  // Atualizar coordenadas em tempo real enquanto digita
+  const updateMapCoordinates = async () => {
+    if (origin) {
+      const coords = await geocodeAddress(origin)
+      if (coords) setOriginCoords(coords)
+    }
+    if (destination) {
+      const coords = await geocodeAddress(destination)
+      if (coords) setDestinationCoords(coords)
+    }
+  }
+
+  // Debounce para não fazer requisições a cada letra
+  const handleAddressChange = (type: 'origin' | 'destination', value: string) => {
+    if (type === 'origin') {
+      setOrigin(value)
+    } else {
+      setDestination(value)
+    }
+  }
+
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     try {
-      // Geocodificar endereços para exibir no mapa
-      const [originCoord, destCoord] = await Promise.all([
-        geocodeAddress(origin),
-        geocodeAddress(destination),
-      ])
+      // Atualizar mapa antes de calcular
+      await updateMapCoordinates()
 
       const response = await axios.post('/api/calculate', {
         vehicleType,
@@ -85,14 +103,20 @@ export default function Calculator({ token }: CalculatorProps) {
       })
 
       setResult(response.data)
-      setOriginCoords(originCoord)
-      setDestinationCoords(destCoord)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao calcular frete. Verifique os endereços.')
     } finally {
       setLoading(false)
     }
   }
+
+  // Atualizar mapa quando endereço mudar
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateMapCoordinates()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [origin, destination])
 
   const downloadPDF = async () => {
     if (!result) return
@@ -117,9 +141,8 @@ export default function Calculator({ token }: CalculatorProps) {
 
   return (
     <div className="calculator-container">
-      <div className="container">
-        <div className={`calculator-wrapper ${result ? 'with-map' : ''}`}>
-          <div className="calculator-card">
+      <div className={`calculator-wrapper`}>
+        <div className="calculator-card">
             <h2>Calculadora de Frete</h2>
             <p className="subtitle">Digite os dados para calcular seu orçamento</p>
 
@@ -232,9 +255,10 @@ export default function Calculator({ token }: CalculatorProps) {
             </form>
           </div>
 
-          {result && (
-            <>
-              <div className="result-card">
+          {!result ? (
+            <></>
+          ) : (
+            <div className="result-card">
                 <h2>Resultado do Orçamento</h2>
 
                 <div className="result-info">
@@ -304,14 +328,15 @@ export default function Calculator({ token }: CalculatorProps) {
                   </div>
                 </div>
               </div>
-              <RouteMap
-                origin={originCoords || undefined}
-                destination={destinationCoords || undefined}
-                originAddress={origin}
-                destinationAddress={destination}
-              />
-            </>
+            </div>
           )}
+
+          <RouteMap
+            origin={originCoords || undefined}
+            destination={destinationCoords || undefined}
+            originAddress={origin}
+            destinationAddress={destination}
+          />
         </div>
       </div>
     </div>
