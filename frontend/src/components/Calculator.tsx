@@ -20,7 +20,12 @@ interface Result {
 // Chama OSRM direto do browser
 async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
   const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=true`
+
+  // fastest → sem alternativas (rota principal do OSRM = menor tempo)
+  // shortest → pede alternativas e pega a de menor distância
+  const alt = type === 'shortest' ? 'true' : 'false'
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alt}&steps=false`
+
   const res = await fetch(url)
   const data = await res.json()
   if (data.code !== 'Ok' || !data.routes?.length) throw new Error('Sem rota')
@@ -28,7 +33,7 @@ async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'sho
   const routes = data.routes as any[]
   const route = type === 'shortest'
     ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
-    : routes[0]
+    : routes[0]  // sempre o primeiro = mais rápida
 
   const distKm = Math.round(route.distance / 1000 * 10) / 10
   const secs = route.duration
