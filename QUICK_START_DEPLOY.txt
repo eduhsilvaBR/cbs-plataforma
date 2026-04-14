@@ -1,0 +1,108 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    🚀 QUICK START - CBS DEPLOYMENT                          ║
+║                         Tempo: ~5 minutos                                   ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 CHECKLIST RÁPIDO
+═══════════════════════════════════════════════════════════════════════════
+
+1️⃣ VERCEL - FRONTEND
+─────────────────────────────────────────────────────────────────────────────
+   [ ] Abra: https://vercel.com
+   [ ] Click "Sign Up" → "Continue with GitHub"
+   [ ] Autorize Vercel no GitHub
+   [ ] Click "Add New Project"
+   [ ] Selecione repositório: internauticayachts/cbs
+   [ ] Confirme build settings (auto-detect Vite)
+   [ ] Adicione Environment Variable:
+       VITE_API_URL = [SERÁ PREENCHIDO DEPOIS]
+   [ ] Click "Deploy"
+   [ ] Aguarde 2-3 minutos
+   [ ] Copie URL: https://cbs-seu-nome.vercel.app
+
+2️⃣ RAILWAY - BACKEND
+─────────────────────────────────────────────────────────────────────────────
+   [ ] Abra: https://railway.app
+   [ ] Click "Start Project"
+   [ ] Selecione "Deploy from GitHub Repo"
+   [ ] Autorize Railway no GitHub
+   [ ] Selecione repositório: internauticayachts/cbs
+   [ ] Configure:
+       Root Directory: backend
+       Build Command: npm run build
+       Start Command: npm start
+   [ ] Click "Deploy"
+   [ ] Aguarde deploy completar
+   [ ] Vá para "Variables" e adicione:
+       PORT=3001
+       JWT_SECRET=cbs-secret-change-this
+       NODE_ENV=production
+   [ ] Click "Save" (Railway vai redeploy)
+   [ ] Copie URL do backend (Deployments tab)
+
+3️⃣ CONECTAR FRONTEND AO BACKEND
+─────────────────────────────────────────────────────────────────────────────
+   [ ] Volte ao Vercel
+   [ ] Settings → Environment Variables
+   [ ] Atualize VITE_API_URL com a URL do Railway
+   [ ] Aguarde ~1 minuto para Vercel redeploy
+
+4️⃣ TESTAR TUDO
+─────────────────────────────────────────────────────────────────────────────
+   [ ] Abra: https://seu-vercel-url.vercel.app
+   [ ] F12 → Console (sem erros?)
+   [ ] Tente calcular um frete
+   [ ] Clique "Baixar PDF"
+   [ ] Teste login/cadastro
+   [ ] Se tudo OK → ✅ SUCESSO!
+
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️ ERROS COMUNS & SOLUÇÕES
+
+Erro: "Cannot read property 'distance' of undefined"
+├─ Causa: VITE_API_URL incorreta ou backend offline
+└─ Solução: Verifique URL do Railway em Vercel settings
+
+Erro: "CORS error: Access to XMLHttpRequest blocked"
+├─ Causa: CORS não configurado
+└─ Solução: Aguarde 2 min e tente novamente (Railway redeploy)
+
+Erro: "404 NOT_FOUND" no frontend
+├─ Causa: Vercel não fez build correto
+└─ Solução: Vá para Deployments, click no deployment e veja logs
+
+Logo não aparece no PDF
+├─ Causa: Arquivo não encontrado no Railway
+└─ Solução: Use URL absoluta no pdf.ts ou copie arquivo
+
+═══════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTAÇÃO COMPLETA
+
+Para guia detalhado com screenshots, veja:
+→ DEPLOY_VERCEL_RAILWAY.md (neste repositório)
+
+Para troubleshooting avançado, veja:
+→ DEPLOY.md
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎯 URLS FINAIS
+
+Frontend:  https://cbs-seu-nome.vercel.app
+Backend:   https://cbs-backend-xxxxx.railway.app
+GitHub:    https://github.com/internauticayachts/cbs
+
+═══════════════════════════════════════════════════════════════════════════
+
+✅ TUDO FEITO? COMEMORE! 🎉
+
+Sua plataforma está live:
+- ✅ Calculadora de fretes funcionando
+- ✅ PDFs sendo gerados com logo
+- ✅ Autenticação funcionando
+- ✅ Painel admin acessível
+- ✅ Auto-deploy ativado (push → deploy automático)
+
+═══════════════════════════════════════════════════════════════════════════

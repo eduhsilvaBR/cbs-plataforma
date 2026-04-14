@@ -1,0 +1,259 @@
+.calculator-container {
+  padding: 40px 20px;
+}
+
+.calculator-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.calculator-card,
+.result-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.calculator-card h2,
+.result-card h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: var(--gray-800);
+}
+
+.subtitle {
+  color: var(--gray-600);
+  margin-bottom: 25px;
+  font-size: 14px;
+}
+
+.error-message {
+  background: rgba(245, 101, 101, 0.1);
+  border-left: 4px solid var(--danger);
+  color: var(--danger);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.form-section {
+  margin-bottom: 25px;
+}
+
+.form-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray-700);
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--gray-700);
+  font-size: 14px;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  color: var(--gray-500);
+  font-size: 12px;
+}
+
+.vehicle-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vehicle-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px;
+  border: 2px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vehicle-option:hover {
+  border-color: var(--primary);
+  background: var(--gray-50);
+}
+
+.vehicle-option.active {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  color: var(--primary);
+}
+
+.vehicle-icon {
+  font-size: 28px;
+}
+
+.vehicle-option span {
+  font-weight: 500;
+}
+
+.btn {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+  background: var(--gray-200);
+  color: var(--gray-800);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--gray-300);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.result-info {
+  margin-top: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.info-row .label {
+  color: var(--gray-600);
+  font-size: 14px;
+}
+
+.info-row .value {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.info-row .value.small {
+  font-size: 12px;
+  max-width: 200px;
+  text-align: right;
+  word-break: break-word;
+}
+
+.divider {
+  height: 1px;
+  background: var(--gray-300);
+  margin: 20px 0;
+}
+
+.calc-details {
+  background: var(--gray-50);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.calc-row span:first-child {
+  color: var(--gray-600);
+}
+
+.calc-row strong {
+  color: var(--gray-800);
+}
+
+.summary {
+  background: var(--gray-50);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+}
+
+.summary-row span:first-child {
+  color: var(--gray-600);
+}
+
+.summary-row.total {
+  border-top: 2px solid var(--gray-200);
+  padding-top: 15px;
+  margin-top: 15px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.summary-row.total span {
+  color: var(--primary);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.actions .btn {
+  padding: 10px;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .calculator-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}
