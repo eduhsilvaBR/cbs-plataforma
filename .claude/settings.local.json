@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(cp -r backend/src api/src)",
+      "Bash(cp backend/package.json api/package.json)",
+      "Bash(cp backend/tsconfig.json api/tsconfig.json)"
     ]
   }
 }
