@@ -28,9 +28,6 @@ export default function Calculator({ token }: CalculatorProps) {
   const [pricePerKm, setPricePerKm] = useState('5.50')
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
-  const [clientName, setClientName] = useState('')
-  const [clientEmail, setClientEmail] = useState('')
-  const [clientPhone, setClientPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Budget | null>(null)
@@ -97,9 +94,9 @@ export default function Calculator({ token }: CalculatorProps) {
         pricePerKm: parseFloat(pricePerKm),
         originAddress: origin,
         destinationAddress: destination,
-        clientName,
-        clientEmail,
-        clientPhone
+        clientName: 'Orçamento',
+        clientEmail: '',
+        clientPhone: ''
       })
 
       setResult(response.data)
@@ -213,40 +210,6 @@ export default function Calculator({ token }: CalculatorProps) {
                     onChange={(e) => setDestination(e.target.value)}
                     placeholder="Ex: Rua B, 456, Rio de Janeiro, RJ"
                     required
-                  />
-                </div>
-              </div>
-
-              <div className="form-section">
-                <h3>Dados do Cliente</h3>
-
-                <div className="form-group">
-                  <label>Nome do Cliente</label>
-                  <input
-                    type="text"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Nome completo"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Email do Cliente</label>
-                  <input
-                    type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    placeholder="email@example.com"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Telefone do Cliente</label>
-                  <input
-                    type="tel"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="(11) 98765-4321"
                   />
                 </div>
               </div>
