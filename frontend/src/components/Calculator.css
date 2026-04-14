@@ -54,12 +54,12 @@
   padding: 32px;
   box-shadow: none;
   border: none;
-  border-left: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
   animation: slideInUp 0.6s ease-out;
   overflow-y: auto;
   height: 100%;
   position: relative;
-  grid-column: 2;
+  grid-column: 1;
 }
 
 .result-card {
@@ -68,12 +68,12 @@
   padding: 32px;
   box-shadow: none;
   border: none;
-  border-left: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
   animation: slideInUp 0.6s ease-out;
   overflow-y: auto;
   height: 100%;
   position: relative;
-  grid-column: 2;
+  grid-column: 1;
 }
 
 .calculator-card h2,
