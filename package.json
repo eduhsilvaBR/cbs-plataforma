@@ -8,7 +8,7 @@
     "dev:api": "cd api && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build:all",
-    "build:all": "(cd api && npm install && npm run build) && (cd frontend && npm install && npm run build)",
+    "build:all": "(cd api && npm install && npm run build) && (cd frontend && npm install && npm run build) && node -e \"const fs=require('fs'); const path=require('path'); fs.cpSync('./frontend/dist', './public', {recursive:true});\"",
     "build:api": "cd api && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "start": "vercel dev"

@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm install && npm run build && cp -r frontend/dist ./public",
+  "buildCommand": "npm install && npm run build",
   "outputDirectory": "./public",
   "devCommand": "npm run dev",
   "functions": {
