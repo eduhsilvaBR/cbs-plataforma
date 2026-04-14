@@ -1,0 +1,210 @@
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(21, 101, 192, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(21, 101, 192, 0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #1a237e 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.splash-screen.fade-out {
+  animation: fadeOutUp 0.8s ease-in-out forwards;
+  pointer-events: none;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 60px;
+  text-align: center;
+  padding: 40px;
+  max-width: 600px;
+}
+
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: slideUp 0.8s ease-out 0.2s both;
+}
+
+.splash-logo {
+  width: 150px;
+  height: auto;
+  filter: brightness(0) invert(1);
+  animation: pulse 2.5s infinite;
+}
+
+.splash-title {
+  font-size: 48px;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+  letter-spacing: -1px;
+  animation: slideUp 0.8s ease-out 0.3s both;
+}
+
+.splash-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  animation: slideUp 0.8s ease-out 0.4s both;
+}
+
+.loading-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  animation: slideUp 0.8s ease-out 0.5s both;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+}
+
+.progress-bar-container {
+  width: 100%;
+  max-width: 300px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.loading-text {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.ready-message {
+  animation: slideUp 0.6s ease-out both;
+}
+
+.success-text {
+  color: rgba(76, 175, 80, 1);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.splash-footer {
+  position: absolute;
+  bottom: 40px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  animation: slideUp 0.8s ease-out 0.6s both;
+}
+
+.splash-footer p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .splash-screen {
+    padding: 20px;
+  }
+
+  .splash-content {
+    gap: 40px;
+  }
+
+  .splash-title {
+    font-size: 36px;
+  }
+
+  .splash-subtitle {
+    font-size: 14px;
+  }
+
+  .splash-logo {
+    width: 120px;
+  }
+
+  .progress-bar-container {
+    max-width: 250px;
+  }
+
+  .splash-footer {
+    bottom: 30px;
+    font-size: 12px;
+  }
+}
