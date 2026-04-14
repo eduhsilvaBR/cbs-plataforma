@@ -17,7 +17,38 @@ interface Result {
   fuelCost: number
 }
 
-// Tenta um servidor OSRM e retorna resultado ou null
+// ── Valhalla (motor de rotas OSM Germany) ──────────────────────────────────
+// Suporta "truck" + shortest:true/false → rotas genuinamente diferentes
+async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
+  try {
+    const body = {
+      locations: [
+        { lon: origin.lng, lat: origin.lat },
+        { lon: dest.lng,   lat: dest.lat   },
+      ],
+      costing: 'truck',
+      directions_type: 'none',
+      shape_format: 'geojson',
+      costing_options: { truck: { shortest } },
+    }
+    const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    })
+    const data = await res.json()
+    const leg = data?.trip?.legs?.[0]
+    if (!leg) return null
+    const distKm = Math.round(leg.summary.length * 10) / 10
+    const secs   = leg.summary.time
+    const routeCoords: [number, number][] = leg.shape.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+    return { distKm, secs, routeCoords }
+  } catch {}
+  return null
+}
+
+// ── OSRM (fallback) ────────────────────────────────────────────────────────
 async function tryOsrm(server: string, coords: string, alt: boolean) {
   try {
     const url = `${server}/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=${alt}&steps=false`
@@ -28,37 +59,35 @@ async function tryOsrm(server: string, coords: string, alt: boolean) {
   return null
 }
 
-// Chama OSRM direto do browser
 async function getOsrmRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
   const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
   const alt = type === 'shortest'
-
-  // Tenta servidores em ordem de preferência
-  // routed-hgv = Heavy Goods Vehicle (caminhão) — mais preciso para fretes
-  const servers = [
-    'https://router.project-osrm.org',
-    'https://routing.openstreetmap.de/routed-hgv',
-    'https://routing.openstreetmap.de/routed-car',
-  ]
-
+  const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
   let routes: any[] | null = null
   for (const server of servers) {
     routes = await tryOsrm(server, coords, alt)
     if (routes) break
   }
-
   if (!routes) throw new Error('Nenhum servidor de rota disponível')
-
   const route = type === 'shortest'
     ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
     : routes[0]
-
   const distKm = Math.round(route.distance / 1000 * 10) / 10
   const secs   = route.duration
+  const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+  return { distKm, secs, routeCoords }
+}
+
+// ── Roteamento principal: Valhalla → OSRM fallback ─────────────────────────
+async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
+  const shortest = type === 'shortest'
+  let result = await tryValhalla(origin, dest, shortest)
+  if (!result) result = await getOsrmRoute(origin, dest, type)
+  if (!result) throw new Error('Nenhum servidor de rota disponível')
+  const { distKm, secs, routeCoords } = result
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   const duration = h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`
-  const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
   return { distKm, duration, routeCoords }
 }
 
@@ -116,7 +145,7 @@ export default function Calculator() {
       setOriginCoords(oCoords)
       setDestinationCoords(dCoords)
 
-      const { distKm, duration, routeCoords: rc } = await getOsrmRoute(oCoords, dCoords, routeType)
+      const { distKm, duration, routeCoords: rc } = await getRoute(oCoords, dCoords, routeType)
       setRouteCoords(rc)
 
       const pricePerKm  = vehicleType === 'MUNK' ? 5.50 : 3.50
