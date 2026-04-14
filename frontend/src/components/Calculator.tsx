@@ -142,13 +142,15 @@ export default function Calculator({ token }: CalculatorProps) {
   return (
     <div className="calculator-container">
       <div className={`calculator-wrapper`}>
-        <div className="calculator-card">
-            <h2>Calculadora de Frete</h2>
-            <p className="subtitle">Digite os dados para calcular seu orçamento</p>
+        <div className={result ? 'result-card' : 'calculator-card'}>
+          {!result ? (
+            <>
+              <h2>Calculadora de Frete</h2>
+              <p className="subtitle">Digite os dados para calcular seu orçamento</p>
 
-            {error && <div className="error-message">{error}</div>}
+              {error && <div className="error-message">{error}</div>}
 
-            <form onSubmit={handleCalculate} className="form">
+              <form onSubmit={handleCalculate} className="form">
               <div className="form-section">
                 <h3>Dados do Veículo</h3>
 
@@ -253,15 +255,12 @@ export default function Calculator({ token }: CalculatorProps) {
                 {loading ? '⏳ Calculando...' : '🚚 Calcular Frete'}
               </button>
             </form>
-          </div>
-
-          {!result ? (
-            <></>
+            </>
           ) : (
-            <div className="result-card">
-                <h2>Resultado do Orçamento</h2>
+            <>
+              <h2>Resultado do Orçamento</h2>
 
-                <div className="result-info">
+              <div className="result-info">
                   <div className="info-row">
                     <span className="label">Orçamento #</span>
                     <span className="value">{result.id.toString().padStart(6, '0')}</span>
@@ -318,26 +317,25 @@ export default function Calculator({ token }: CalculatorProps) {
                     </div>
                   </div>
 
-                  <div className="actions">
-                    <button className="btn btn-primary" onClick={downloadPDF}>
-                      📄 Baixar PDF
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setResult(null)}>
-                      ← Novo Cálculo
-                    </button>
-                  </div>
+                <div className="actions">
+                  <button className="btn btn-primary" onClick={downloadPDF}>
+                    📄 Baixar PDF
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setResult(null)}>
+                    ← Novo Cálculo
+                  </button>
                 </div>
               </div>
-            </div>
+            </>
           )}
-
-          <RouteMap
-            origin={originCoords || undefined}
-            destination={destinationCoords || undefined}
-            originAddress={origin}
-            destinationAddress={destination}
-          />
         </div>
+
+        <RouteMap
+          origin={originCoords || undefined}
+          destination={destinationCoords || undefined}
+          originAddress={origin}
+          destinationAddress={destination}
+        />
       </div>
     </div>
   )

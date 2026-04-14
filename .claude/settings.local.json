@@ -7,7 +7,8 @@
       "Bash(cp backend/tsconfig.json api/tsconfig.json)",
       "WebFetch(domain:www.semparar.com.br)",
       "Bash(mkdir -p public)",
-      "Bash(cp \"../logo cbs.png\" \"public/logo cbs.png\")"
+      "Bash(cp \"../logo cbs.png\" \"public/logo cbs.png\")",
+      "Bash(npm run:*)"
     ]
   }
 }
