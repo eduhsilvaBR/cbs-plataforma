@@ -1,56 +1,86 @@
 import axios from 'axios';
 import { DistanceResult } from './types.js';
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
+// Função para geocodificar endereço usando Nominatim (OpenStreetMap - GRATUITO)
+const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: {
+        q: address,
+        format: 'json',
+        limit: 1,
+      },
+      headers: {
+        'User-Agent': 'CBS-Frete-Calculator',
+      },
+    });
+
+    if (response.data && response.data.length > 0) {
+      const { lat, lon } = response.data[0];
+      return { lat: parseFloat(lat), lng: parseFloat(lon) };
+    }
+    return null;
+  } catch (error) {
+    console.error('Erro ao geocodificar endereço:', error);
+    return null;
+  }
+};
+
+// Fórmula de Haversine para calcular distância entre dois pontos (lat, lng)
+const calculateHaversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return Math.round(distance * 10) / 10; // Arredondar para 1 casa decimal
+};
 
 export const calculateDistance = async (
   origin: string,
   destination: string
 ): Promise<DistanceResult> => {
-  // Se não tiver API key, fazer uma estimativa simples baseada no padrão
-  if (!GOOGLE_MAPS_API_KEY) {
-    console.warn('⚠️ GOOGLE_MAPS_API_KEY não configurada, usando estimativa');
-    return estimateDistance(origin, destination);
-  }
-
   try {
-    const url = 'https://maps.googleapis.com/maps/api/distancematrix/json';
-    const params = {
-      origins: origin,
-      destinations: destination,
-      key: GOOGLE_MAPS_API_KEY,
-      language: 'pt-BR'
-    };
+    // Geocodificar ambos os endereços usando Nominatim (GRATUITO)
+    const originCoords = await geocodeAddress(origin);
+    const destinationCoords = await geocodeAddress(destination);
 
-    const response = await axios.get(url, { params });
-
-    if (response.data.status === 'OK' && response.data.rows[0].elements[0].status === 'OK') {
-      const element = response.data.rows[0].elements[0];
-      const distanceInMeters = element.distance.value;
-      const distanceInKm = distanceInMeters / 1000;
-      const duration = element.duration.text;
-
-      return {
-        distance: Math.round(distanceInKm * 10) / 10, // Arredondar para 1 casa decimal
-        duration
-      };
-    } else {
-      console.error('Erro na resposta do Google Maps:', response.data.status);
+    if (!originCoords || !destinationCoords) {
+      console.warn('⚠️ Não foi possível geocodificar os endereços, usando estimativa');
       return estimateDistance(origin, destination);
     }
+
+    // Calcular distância usando Haversine
+    const distance = calculateHaversineDistance(
+      originCoords.lat,
+      originCoords.lng,
+      destinationCoords.lat,
+      destinationCoords.lng
+    );
+
+    // Estimar duração: 1 hora por 100km aproximadamente
+    const durationHours = Math.ceil(distance / 100);
+    const duration = durationHours > 1 ? `${durationHours}h` : '1h';
+
+    return {
+      distance,
+      duration
+    };
   } catch (error) {
-    console.error('Erro ao chamar Google Maps:', error);
+    console.error('Erro ao calcular distância:', error);
     return estimateDistance(origin, destination);
   }
 };
 
-// Estimativa simples se Google Maps falhar
+// Estimativa simples como fallback
 const estimateDistance = (origin: string, destination: string): DistanceResult => {
-  // Estimativa bem básica - na prática você usaria a API real
-  // Apenas para demonstração quando não houver API key
   return {
     distance: 50, // 50 km padrão
-    duration: 'Estimado'
+    duration: '1h'
   };
 };
 
