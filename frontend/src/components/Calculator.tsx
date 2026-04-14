@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
+import RouteMap from './RouteMap'
 import './Calculator.css'
 
 interface Budget {
@@ -11,6 +12,11 @@ interface Budget {
   totalPrice: number
   duration: string
   createdAt: string
+}
+
+interface Coordinates {
+  lat: number
+  lng: number
 }
 
 interface CalculatorProps {
@@ -28,6 +34,31 @@ export default function Calculator({ token }: CalculatorProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Budget | null>(null)
+  const [originCoords, setOriginCoords] = useState<Coordinates | null>(null)
+  const [destinationCoords, setDestinationCoords] = useState<Coordinates | null>(null)
+
+  const geocodeAddress = async (address: string): Promise<Coordinates | null> => {
+    try {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      if (!apiKey) return null
+
+      const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+        params: {
+          address,
+          key: apiKey,
+        },
+      })
+
+      if (response.data.results && response.data.results.length > 0) {
+        const { lat, lng } = response.data.results[0].geometry.location
+        return { lat, lng }
+      }
+      return null
+    } catch (err) {
+      console.error('Erro ao geocodificar endereço:', err)
+      return null
+    }
+  }
 
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,6 +66,12 @@ export default function Calculator({ token }: CalculatorProps) {
     setError('')
 
     try {
+      // Geocodificar endereços para exibir no mapa
+      const [originCoord, destCoord] = await Promise.all([
+        geocodeAddress(origin),
+        geocodeAddress(destination),
+      ])
+
       const response = await axios.post('/api/calculate', {
         vehicleType,
         pricePerKm: parseFloat(pricePerKm),
@@ -46,6 +83,8 @@ export default function Calculator({ token }: CalculatorProps) {
       })
 
       setResult(response.data)
+      setOriginCoords(originCoord)
+      setDestinationCoords(destCoord)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao calcular frete. Verifique os endereços.')
     } finally {
@@ -77,7 +116,7 @@ export default function Calculator({ token }: CalculatorProps) {
   return (
     <div className="calculator-container">
       <div className="container">
-        <div className="calculator-wrapper">
+        <div className={`calculator-wrapper ${result ? 'with-map' : ''}`}>
           <div className="calculator-card">
             <h2>Calculadora de Frete</h2>
             <p className="subtitle">Digite os dados para calcular seu orçamento</p>
@@ -192,76 +231,84 @@ export default function Calculator({ token }: CalculatorProps) {
           </div>
 
           {result && (
-            <div className="result-card">
-              <h2>Resultado do Orçamento</h2>
+            <>
+              <div className="result-card">
+                <h2>Resultado do Orçamento</h2>
 
-              <div className="result-info">
-                <div className="info-row">
-                  <span className="label">Orçamento #</span>
-                  <span className="value">{result.id.toString().padStart(6, '0')}</span>
-                </div>
-
-                <div className="info-row">
-                  <span className="label">Veículo</span>
-                  <span className="value">{result.vehicleType}</span>
-                </div>
-
-                <div className="info-row">
-                  <span className="label">Origem</span>
-                  <span className="value small">{origin}</span>
-                </div>
-
-                <div className="info-row">
-                  <span className="label">Destino</span>
-                  <span className="value small">{destination}</span>
-                </div>
-
-                <div className="divider"></div>
-
-                <div className="calc-details">
-                  <div className="calc-row">
-                    <span>Distância</span>
-                    <strong>{result.distance} km</strong>
+                <div className="result-info">
+                  <div className="info-row">
+                    <span className="label">Orçamento #</span>
+                    <span className="value">{result.id.toString().padStart(6, '0')}</span>
                   </div>
-                  <div className="calc-row">
-                    <span>Tempo Estimado</span>
-                    <strong>{result.duration}</strong>
-                  </div>
-                  <div className="calc-row">
-                    <span>Valor por km</span>
-                    <strong>R$ {(result.basePrice / result.distance).toFixed(2)}</strong>
-                  </div>
-                </div>
 
-                <div className="divider"></div>
-
-                <div className="summary">
-                  <div className="summary-row">
-                    <span>Frete Base</span>
-                    <span>R$ {result.basePrice.toFixed(2)}</span>
+                  <div className="info-row">
+                    <span className="label">Veículo</span>
+                    <span className="value">{result.vehicleType}</span>
                   </div>
-                  {result.tolEstimate > 0 && (
-                    <div className="summary-row">
-                      <span>Estimativa de Pedágio</span>
-                      <span>R$ {result.tolEstimate.toFixed(2)}</span>
+
+                  <div className="info-row">
+                    <span className="label">Origem</span>
+                    <span className="value small">{origin}</span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="label">Destino</span>
+                    <span className="value small">{destination}</span>
+                  </div>
+
+                  <div className="divider"></div>
+
+                  <div className="calc-details">
+                    <div className="calc-row">
+                      <span>Distância</span>
+                      <strong>{result.distance} km</strong>
                     </div>
-                  )}
-                  <div className="summary-row total">
-                    <span>TOTAL</span>
-                    <span>R$ {result.totalPrice.toFixed(2)}</span>
+                    <div className="calc-row">
+                      <span>Tempo Estimado</span>
+                      <strong>{result.duration}</strong>
+                    </div>
+                    <div className="calc-row">
+                      <span>Valor por km</span>
+                      <strong>R$ {(result.basePrice / result.distance).toFixed(2)}</strong>
+                    </div>
                   </div>
-                </div>
 
-                <div className="actions">
-                  <button className="btn btn-primary" onClick={downloadPDF}>
-                    📄 Baixar PDF
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => setResult(null)}>
-                    ← Novo Cálculo
-                  </button>
+                  <div className="divider"></div>
+
+                  <div className="summary">
+                    <div className="summary-row">
+                      <span>Frete Base</span>
+                      <span>R$ {result.basePrice.toFixed(2)}</span>
+                    </div>
+                    {result.tolEstimate > 0 && (
+                      <div className="summary-row">
+                        <span>Estimativa de Pedágio</span>
+                        <span>R$ {result.tolEstimate.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="summary-row total">
+                      <span>TOTAL</span>
+                      <span>R$ {result.totalPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="actions">
+                    <button className="btn btn-primary" onClick={downloadPDF}>
+                      📄 Baixar PDF
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setResult(null)}>
+                      ← Novo Cálculo
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+              <RouteMap
+                origin={originCoords || undefined}
+                destination={destinationCoords || undefined}
+                originAddress={origin}
+                destinationAddress={destination}
+              />
+            </>
           )}
         </div>
       </div>
