@@ -4,7 +4,7 @@
   "description": "Plataforma de cálculo de frete para transporte - Frontend + API Vercel",
   "private": true,
   "scripts": {
-    "build": "(cd frontend && npm install && npm run build) && node -e \"const fs=require('fs'); const path=require('path'); fs.cpSync('./frontend/dist', './public', {recursive:true});\""
+    "build": "(cd frontend && npm install && npm run build) && (cd api && npm install && npm run build) && node -e \"const fs=require('fs'); const path=require('path'); fs.cpSync('./frontend/dist', './public', {recursive:true});\""
   },
   "dependencies": {},
   "devDependencies": {}
