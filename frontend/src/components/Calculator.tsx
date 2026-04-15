@@ -5,18 +5,14 @@ import RouteMap from './RouteMap'
 import './Calculator.css'
 
 interface Coords { lat: number; lng: number }
-interface RouteData {
-  distKm: number
-  duration: string
-}
-
 interface Result {
   id: number
   vehicleType: string
   routeType: string
-  ida: RouteData
-  volta: RouteData
-  totalDistance: number
+  distance: number
+  duration: string
+  ida?: { distKm: number; duration: string }
+  volta?: { distKm: number; duration: string }
   basePrice: number
   tolEstimate: number
   totalPrice: number
@@ -114,15 +110,16 @@ async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortes
 }
 
 export default function Calculator() {
-  const [vehicleType, setVehicleType] = useState<'MUNK' | 'PRANCHA'>('MUNK')
-  const [routeType,   setRouteType]   = useState<'fastest' | 'shortest'>('fastest')
-  const [fuelPrice,   setFuelPrice]   = useState('6.50')
-  const [consumption, setConsumption] = useState('8')
-  const [origin,      setOrigin]      = useState('')
-  const [destination, setDestination] = useState('')
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState('')
-  const [result,      setResult]      = useState<Result | null>(null)
+  const [vehicleType,  setVehicleType]  = useState<'MUNK' | 'PRANCHA'>('MUNK')
+  const [routeType,    setRouteType]    = useState<'fastest' | 'shortest'>('fastest')
+  const [fuelPrice,    setFuelPrice]    = useState('6.50')
+  const [consumption,  setConsumption]  = useState('8')
+  const [fretePerKm,   setFretePerKm]   = useState('5.50')
+  const [origin,       setOrigin]       = useState('')
+  const [destination,  setDestination]  = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [result,       setResult]       = useState<Result | null>(null)
 
   const [originCoords,      setOriginCoords]      = useState<Coords | undefined>()
   const [destinationCoords, setDestinationCoords] = useState<Coords | undefined>()
@@ -155,10 +152,10 @@ export default function Calculator() {
     return () => clearTimeout(t)
   }, [origin, destination])
 
-  const calcular = async (orig: string, dest: string, keepResult = false) => {
+  const calcular = async (orig: string, dest: string, includeVolta = false) => {
     if (!orig || !dest) return
     setLoading(true); setError('')
-    if (!keepResult) { setResult(null); setRouteCoords(undefined) }
+    if (!includeVolta) { setResult(null); setRouteCoords(undefined) }
     try {
       // Geocodifica endereços uma vez
       const geoRes = await apiClient.post('/api/calculate', {
@@ -171,25 +168,37 @@ export default function Calculator() {
       // Calcula IDA: orig → dest
       const idaRoute = await getRoute(oCoords, dCoords, routeType)
 
-      // Calcula VOLTA: dest → orig (mesma rota, sentido oposto)
-      const voltaRoute = await getRoute(dCoords, oCoords, routeType)
-
       // Usa rota da IDA no mapa
       setRouteCoords(idaRoute.routeCoords)
 
-      const pricePerKm  = vehicleType === 'MUNK' ? 5.50 : 3.50
-      const totalDist   = idaRoute.distKm + voltaRoute.distKm
+      const pricePerKm = parseFloat(fretePerKm)
+      let totalDist = idaRoute.distKm
+      let resultObj: Result = {
+        id: Math.floor(Math.random() * 100000),
+        vehicleType, routeType,
+        distance: idaRoute.distKm,
+        duration: idaRoute.duration,
+        basePrice: 0,
+        tolEstimate: 0,
+        totalPrice: 0,
+        fuelCost: 0
+      }
+
+      // Se incluir volta, calcula também
+      if (includeVolta) {
+        const voltaRoute = await getRoute(dCoords, oCoords, routeType)
+        totalDist = idaRoute.distKm + voltaRoute.distKm
+        resultObj.ida = { distKm: idaRoute.distKm, duration: idaRoute.duration }
+        resultObj.volta = { distKm: voltaRoute.distKm, duration: voltaRoute.duration }
+      }
+
       const basePrice   = parseFloat((totalDist * pricePerKm).toFixed(2))
       const tolEstimate = parseFloat((totalDist * 0.12).toFixed(2))
       const totalPrice  = parseFloat((basePrice + tolEstimate).toFixed(2))
       const fuelCost    = parseFloat(((totalDist / parseFloat(consumption)) * parseFloat(fuelPrice)).toFixed(2))
 
       setResult({
-        id: Math.floor(Math.random() * 100000),
-        vehicleType, routeType,
-        ida: { distKm: idaRoute.distKm, duration: idaRoute.duration },
-        volta: { distKm: voltaRoute.distKm, duration: voltaRoute.duration },
-        totalDistance: totalDist,
+        ...resultObj,
         basePrice, tolEstimate, totalPrice, fuelCost
       })
     } catch (err: any) {
@@ -201,13 +210,9 @@ export default function Calculator() {
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); calcular(origin, destination) }
 
   const handleVolta = () => {
-    const novaOrig = destination
-    const novaDest = origin
-    if (!novaOrig || !novaDest) { setError('Endereços não definidos'); return }
-    setOrigin(novaOrig)
-    setDestination(novaDest)
-    setRouteCoords(undefined)
-    calcular(novaOrig, novaDest, false)
+    if (!origin || !destination) { setError('Endereços não definidos'); return }
+    // Calcula IDA + VOLTA com os endereços atuais
+    calcular(origin, destination, true)
   }
 
   const downloadPDF = async () => {
@@ -256,7 +261,10 @@ export default function Calculator() {
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(30, 30, 30)
     doc.setFontSize(10)
-    doc.text(`${result.totalDistance} km`, margin, y)
+    const distText = result.ida && result.volta
+      ? `Ida: ${result.ida.distKm} km | Volta: ${result.volta.distKm} km | Total: ${(result.ida.distKm + result.volta.distKm).toFixed(1)} km`
+      : `${result.distance} km`
+    doc.text(distText, margin, y)
     y += 12
 
     // ORIGEM
@@ -335,10 +343,18 @@ export default function Calculator() {
 
               <div className="options-row">
                 <div className="option-input">
+                  <label>Frete (R$/km)</label>
+                  <input type="number" step="0.01" min="0" value={fretePerKm}
+                    onChange={e => setFretePerKm(e.target.value)} required />
+                </div>
+                <div className="option-input">
                   <label>Combustível (R$)</label>
                   <input type="number" step="0.01" min="0" value={fuelPrice}
                     onChange={e => setFuelPrice(e.target.value)} required />
                 </div>
+              </div>
+
+              <div className="options-row">
                 <div className="option-input">
                   <label>Consumo (km/l)</label>
                   <input type="number" step="0.1" min="0.1" value={consumption}
@@ -386,12 +402,15 @@ export default function Calculator() {
               <div className="result-row"><span className="rl">Origem</span><span className="rv small">{origin}</span></div>
               <div className="result-row"><span className="rl">Destino</span><span className="rv small">{destination}</span></div>
 
-              <div style={{marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #eee'}}>
-                <div className="result-row"><span className="rl">📍 Ida</span><span className="rv">{result.ida.distKm} km · {result.ida.duration}</span></div>
-                <div className="result-row"><span className="rl">📍 Volta</span><span className="rv">{result.volta.distKm} km · {result.volta.duration}</span></div>
-              </div>
-
-              <div className="result-row"><span className="rl">Total</span><span className="rv" style={{fontWeight: '700', color: '#1565c0'}}>{result.totalDistance} km</span></div>
+              {result.ida && result.volta ? (
+                <div style={{marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #eee'}}>
+                  <div className="result-row"><span className="rl">📍 Ida</span><span className="rv">{result.ida.distKm} km · {result.ida.duration}</span></div>
+                  <div className="result-row"><span className="rl">📍 Volta</span><span className="rv">{result.volta.distKm} km · {result.volta.duration}</span></div>
+                  <div className="result-row"><span className="rl" style={{fontWeight: '700'}}>Total</span><span className="rv" style={{fontWeight: '700', color: '#1565c0'}}>{(result.ida.distKm + result.volta.distKm).toFixed(1)} km</span></div>
+                </div>
+              ) : (
+                <div className="result-row"><span className="rl">Distância</span><span className="rv">{result.distance} km · {result.duration}</span></div>
+              )}
             </div>
 
             <div className="summary-box">
