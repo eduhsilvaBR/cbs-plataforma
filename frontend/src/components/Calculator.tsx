@@ -178,7 +178,8 @@ export default function Calculator() {
         basePrice, tolEstimate, totalPrice, fuelCost
       })
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao calcular. Verifique os endereços.')
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao calcular. Verifique os endereços.'
+      setError(msg)
     } finally { setLoading(false) }
   }
 
@@ -187,9 +188,10 @@ export default function Calculator() {
   const handleVolta = () => {
     const novaOrig = destination
     const novaDest = origin
+    if (!novaOrig || !novaDest) { setError('Endereços não definidos'); return }
     setOrigin(novaOrig)
     setDestination(novaDest)
-    setRouteCoords(undefined) // limpa rota anterior para forçar redesenho
+    setRouteCoords(undefined)
     calcular(novaOrig, novaDest, true)
   }
 
