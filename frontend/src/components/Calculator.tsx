@@ -215,7 +215,7 @@ export default function Calculator() {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     const W = 210, margin = 20
 
-    // Carregar logo e converter para base64
+    // Carregar logo
     try {
       const logoRes = await fetch('/logo cbs.png')
       const blob    = await logoRes.blob()
@@ -227,123 +227,76 @@ export default function Calculator() {
       doc.addImage(b64, 'PNG', margin, 12, 30, 18)
     } catch {}
 
-    // Cabeçalho azul
-    doc.setFillColor(21, 101, 192)
-    doc.rect(0, 0, W, 10, 'F')
-
     // Título
-    doc.setFontSize(18)
+    doc.setFontSize(16)
     doc.setTextColor(21, 101, 192)
     doc.setFont('helvetica', 'bold')
-    doc.text('CBS TRANSPORTES NÁUTICOS', 56, 22)
+    doc.text('CBS TRANSPORTES NÁUTICOS', 60, 25)
 
+    let y = 45
+
+    // VEÍCULO
     doc.setFontSize(11)
-    doc.setTextColor(100, 100, 100)
+    doc.setTextColor(21, 101, 192)
+    doc.setFont('helvetica', 'bold')
+    doc.text('VEÍCULO', margin, y)
+    y += 6
     doc.setFont('helvetica', 'normal')
-    doc.text('Orçamento de Frete', 56, 28)
-
-    // Número do orçamento
+    doc.setTextColor(30, 30, 30)
     doc.setFontSize(10)
-    doc.setTextColor(80, 80, 80)
-    doc.text(`Nº ${String(result.id).padStart(6,'0')}   |   ${new Date().toLocaleDateString('pt-BR')}`, margin, 40)
+    doc.text(result.vehicleType, margin, y)
+    y += 12
 
-    // Linha divisória
-    doc.setDrawColor(21, 101, 192)
-    doc.setLineWidth(0.5)
-    doc.line(margin, 43, W - margin, 43)
-
-    // Seção: Dados da viagem
-    let y = 52
-    doc.setFontSize(11)
+    // DISTÂNCIA
+    doc.setFont('helvetica', 'bold')
     doc.setTextColor(21, 101, 192)
+    doc.setFontSize(11)
+    doc.text('DISTÂNCIA', margin, y)
+    y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(30, 30, 30)
+    doc.setFontSize(10)
+    doc.text(`${result.totalDistance} km`, margin, y)
+    y += 12
+
+    // ORIGEM
     doc.setFont('helvetica', 'bold')
-    doc.text('DADOS DA VIAGEM', margin, y)
-    y += 7
-
-    const row = (label: string, value: string) => {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.setTextColor(120, 120, 120)
-      doc.text(label, margin, y)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(30, 30, 30)
-      doc.text(value, margin + 35, y)
-      y += 7
-    }
-
-    row('Veículo:', result.vehicleType)
-    row('Tipo de Rota:', result.routeType === 'fastest' ? 'Mais Rápida' : 'Mais Curta')
-    row('Distância Ida:', `${result.ida.distKm} km`)
-    row('Distância Volta:', `${result.volta.distKm} km`)
-    row('Distância Total:', `${result.totalDistance} km`)
-
-    // Endereços (texto longo)
-    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(21, 101, 192)
+    doc.setFontSize(11)
+    doc.text('ORIGEM', margin, y)
+    y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(30, 30, 30)
     doc.setFontSize(9)
-    doc.setTextColor(120, 120, 120)
-    doc.text('Origem:', margin, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(30, 30, 30)
-    const origLines = doc.splitTextToSize(origin, W - margin - 55)
-    doc.text(origLines, margin + 35, y)
-    y += origLines.length * 5 + 2
+    const origLines = doc.splitTextToSize(origin, W - margin*2)
+    doc.text(origLines, margin, y)
+    y += origLines.length * 4 + 8
 
+    // DESTINO
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(120, 120, 120)
-    doc.text('Destino:', margin, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(30, 30, 30)
-    const destLines = doc.splitTextToSize(destination, W - margin - 55)
-    doc.text(destLines, margin + 35, y)
-    y += destLines.length * 5 + 8
-
-    // Linha
-    doc.setDrawColor(220, 220, 220)
-    doc.line(margin, y, W - margin, y)
-    y += 8
-
-    // Seção: Valores
-    doc.setFontSize(11)
     doc.setTextColor(21, 101, 192)
-    doc.setFont('helvetica', 'bold')
-    doc.text('RESUMO FINANCEIRO', margin, y)
-    y += 8
+    doc.setFontSize(11)
+    doc.text('DESTINO', margin, y)
+    y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(30, 30, 30)
+    doc.setFontSize(9)
+    const destLines = doc.splitTextToSize(destination, W - margin*2)
+    doc.text(destLines, margin, y)
+    y += destLines.length * 4 + 12
 
-    // Box amarelo
+    // VALOR TOTAL (box amarelo)
     doc.setFillColor(255, 251, 235)
     doc.setDrawColor(252, 211, 77)
-    doc.roundedRect(margin, y, W - margin*2, 50, 3, 3, 'FD')
-    y += 8
+    doc.roundedRect(margin, y, W - margin*2, 25, 3, 3, 'FD')
+    y += 4
 
-    const fin = (label: string, value: string, bold = false) => {
-      doc.setFont('helvetica', bold ? 'bold' : 'normal')
-      doc.setFontSize(bold ? 12 : 10)
-      doc.setTextColor(bold ? 217 : 80, bold ? 119 : 80, bold ? 6 : 80)
-      doc.text(label, margin + 5, y)
-      doc.setTextColor(bold ? 217 : 30, bold ? 119 : 30, bold ? 6 : 30)
-      doc.text(value, W - margin - 5, y, { align: 'right' })
-      y += bold ? 9 : 8
-    }
-
-    fin('Frete Base', `R$ ${result.basePrice.toFixed(2)}`)
-    fin('Pedágio Estimado', `R$ ${result.tolEstimate.toFixed(2)}`)
-    fin('Combustível', `R$ ${result.fuelCost.toFixed(2)}`)
-
-    // Linha total
-    doc.setDrawColor(252, 211, 77)
-    doc.line(margin + 5, y - 2, W - margin - 5, y - 2)
-    y += 2
-    fin('TOTAL', `R$ ${(result.totalPrice + result.fuelCost).toFixed(2)}`, true)
-
-    // Rodapé
-    y = 270
-    doc.setDrawColor(21, 101, 192)
-    doc.line(margin, y, W - margin, y)
-    doc.setFontSize(8)
-    doc.setTextColor(150, 150, 150)
-    doc.setFont('helvetica', 'normal')
-    doc.text('* Valores de pedágio são estimativas. CBS Transportes Náuticos.', margin, y + 6)
-    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, W - margin, y + 6, { align: 'right' })
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(217, 119, 6)
+    doc.setFontSize(12)
+    doc.text('VALOR TOTAL', margin + 8, y + 8)
+    doc.setFontSize(14)
+    doc.text(`R$ ${(result.totalPrice + result.fuelCost).toFixed(2)}`, W - margin - 8, y + 8, { align: 'right' })
 
     doc.save(`orcamento-cbs-${result.id}.pdf`)
   }
