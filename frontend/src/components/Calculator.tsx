@@ -5,12 +5,18 @@ import RouteMap from './RouteMap'
 import './Calculator.css'
 
 interface Coords { lat: number; lng: number }
+interface RouteData {
+  distKm: number
+  duration: string
+}
+
 interface Result {
   id: number
   vehicleType: string
   routeType: string
-  distance: number
-  duration: string
+  ida: RouteData
+  volta: RouteData
+  totalDistance: number
   basePrice: number
   tolEstimate: number
   totalPrice: number
@@ -154,6 +160,7 @@ export default function Calculator() {
     setLoading(true); setError('')
     if (!keepResult) { setResult(null); setRouteCoords(undefined) }
     try {
+      // Geocodifica endereços uma vez
       const geoRes = await apiClient.post('/api/calculate', {
         vehicleType, originAddress: orig, destinationAddress: dest
       })
@@ -161,20 +168,28 @@ export default function Calculator() {
       setOriginCoords(oCoords)
       setDestinationCoords(dCoords)
 
-      const { distKm, duration, routeCoords: rc } = await getRoute(oCoords, dCoords, routeType)
-      setRouteCoords(rc)
+      // Calcula IDA: orig → dest
+      const idaRoute = await getRoute(oCoords, dCoords, routeType)
+
+      // Calcula VOLTA: dest → orig (mesma rota, sentido oposto)
+      const voltaRoute = await getRoute(dCoords, oCoords, routeType)
+
+      // Usa rota da IDA no mapa
+      setRouteCoords(idaRoute.routeCoords)
 
       const pricePerKm  = vehicleType === 'MUNK' ? 5.50 : 3.50
-      const basePrice   = parseFloat((distKm * pricePerKm).toFixed(2))
-      // Pedágio: ~R$0.12/km (média nacional) — apenas estimativa
-      const tolEstimate = parseFloat((distKm * 0.12).toFixed(2))
+      const totalDist   = idaRoute.distKm + voltaRoute.distKm
+      const basePrice   = parseFloat((totalDist * pricePerKm).toFixed(2))
+      const tolEstimate = parseFloat((totalDist * 0.12).toFixed(2))
       const totalPrice  = parseFloat((basePrice + tolEstimate).toFixed(2))
-      const fuelCost    = parseFloat(((distKm / parseFloat(consumption)) * parseFloat(fuelPrice)).toFixed(2))
+      const fuelCost    = parseFloat(((totalDist / parseFloat(consumption)) * parseFloat(fuelPrice)).toFixed(2))
 
       setResult({
         id: Math.floor(Math.random() * 100000),
         vehicleType, routeType,
-        distance: distKm, duration,
+        ida: { distKm: idaRoute.distKm, duration: idaRoute.duration },
+        volta: { distKm: voltaRoute.distKm, duration: voltaRoute.duration },
+        totalDistance: totalDist,
         basePrice, tolEstimate, totalPrice, fuelCost
       })
     } catch (err: any) {
@@ -192,7 +207,7 @@ export default function Calculator() {
     setOrigin(novaOrig)
     setDestination(novaDest)
     setRouteCoords(undefined)
-    calcular(novaOrig, novaDest, true)
+    calcular(novaOrig, novaDest, false)
   }
 
   const downloadPDF = async () => {
@@ -258,8 +273,9 @@ export default function Calculator() {
 
     row('Veículo:', result.vehicleType)
     row('Tipo de Rota:', result.routeType === 'fastest' ? 'Mais Rápida' : 'Mais Curta')
-    row('Distância:', `${result.distance} km`)
-    row('Duração Est.:', result.duration)
+    row('Distância Ida:', `${result.ida.distKm} km`)
+    row('Distância Volta:', `${result.volta.distKm} km`)
+    row('Distância Total:', `${result.totalDistance} km`)
 
     // Endereços (texto longo)
     doc.setFont('helvetica', 'bold')
@@ -416,8 +432,13 @@ export default function Calculator() {
               <div className="result-row"><span className="rl">Rota</span><span className="rv">{result.routeType==='fastest'?'⚡ Mais Rápida':'📏 Mais Curta'}</span></div>
               <div className="result-row"><span className="rl">Origem</span><span className="rv small">{origin}</span></div>
               <div className="result-row"><span className="rl">Destino</span><span className="rv small">{destination}</span></div>
-              <div className="result-row"><span className="rl">Distância</span><span className="rv">{result.distance} km</span></div>
-              <div className="result-row"><span className="rl">Duração</span><span className="rv">{result.duration}</span></div>
+
+              <div style={{marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #eee'}}>
+                <div className="result-row"><span className="rl">📍 Ida</span><span className="rv">{result.ida.distKm} km · {result.ida.duration}</span></div>
+                <div className="result-row"><span className="rl">📍 Volta</span><span className="rv">{result.volta.distKm} km · {result.volta.duration}</span></div>
+              </div>
+
+              <div className="result-row"><span className="rl">Total</span><span className="rv" style={{fontWeight: '700', color: '#1565c0'}}>{result.totalDistance} km</span></div>
             </div>
 
             <div className="summary-box">
@@ -435,9 +456,6 @@ export default function Calculator() {
               <button className="btn-pdf" onClick={downloadPDF}>📄 Baixar PDF</button>
               <button className="btn-novo" onClick={() => { setResult(null); setRouteCoords(undefined) }}>← Novo Cálculo</button>
             </div>
-            <button className="btn-volta" onClick={handleVolta} disabled={loading}>
-              {loading ? '⏳ Calculando...' : '🔄 Calcular Volta'}
-            </button>
           </>
         )}
       </div>
