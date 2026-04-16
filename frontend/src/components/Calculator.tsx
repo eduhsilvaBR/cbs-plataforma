@@ -7,6 +7,7 @@ import './Calculator.css'
 interface Coords { lat: number; lng: number }
 interface Result {
   id: number
+  clientName?: string
   vehicleType: string
   routeType: string
   distance: number
@@ -118,6 +119,7 @@ export default function Calculator() {
   const [routeType,    setRouteType]    = useState<'fastest' | 'shortest'>('fastest')
   const [fuelPrice,    setFuelPrice]    = useState('6.50')
   const [consumption,  setConsumption]  = useState('8')
+  const [clientName,   setClientName]   = useState('')
   const [fretePerKm,   setFretePerKm]   = useState('5.50')
   const [origin,       setOrigin]       = useState('')
   const [parada1,      setParada1]      = useState('')
@@ -237,6 +239,7 @@ export default function Calculator() {
 
       setResult({
         ...resultObj,
+        clientName: clientName || undefined,
         basePrice, tolEstimate, totalPrice, fuelCost
       })
     } catch (err: any) {
@@ -279,6 +282,20 @@ export default function Calculator() {
     doc.text('CBS TRANSPORTES NÁUTICOS', 60, 25)
 
     let y = 45
+
+    // CLIENTE (se houver)
+    if (result.clientName) {
+      doc.setFontSize(11)
+      doc.setTextColor(21, 101, 192)
+      doc.setFont('helvetica', 'bold')
+      doc.text('CLIENTE', margin, y)
+      y += 6
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(30, 30, 30)
+      doc.setFontSize(10)
+      doc.text(result.clientName, margin, y)
+      y += 12
+    }
 
     // VEÍCULO
     doc.setFontSize(11)
@@ -369,6 +386,11 @@ export default function Calculator() {
             {error && <div className="error-msg">{error}</div>}
 
             <form onSubmit={handleSubmit}>
+              <div style={{marginBottom: '16px'}}>
+                <input type="text" placeholder="Nome do Cliente (opcional)" value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  style={{width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #e0e0e0', fontSize: '14px', fontFamily: 'inherit'}} />
+              </div>
               <div className="address-inputs">
                 <div className="address-field">
                   <span className="addr-icon">📍</span>
@@ -451,6 +473,11 @@ export default function Calculator() {
             </div>
 
             {error && <div className="error-msg">{error}</div>}
+            {result.clientName && (
+              <div style={{padding: '10px 12px', background: '#f0f7ff', border: '1px solid #1565c0', borderRadius: '8px', marginBottom: '12px', fontSize: '13px', color: '#1565c0', fontWeight: '600'}}>
+                👤 Cliente: {result.clientName}
+              </div>
+            )}
 
             <div className="result-rows">
               <div className="result-row"><span className="rl">Veículo</span><span className="rv">{result.vehicleType}</span></div>
