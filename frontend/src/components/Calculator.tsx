@@ -393,27 +393,27 @@ export default function Calculator() {
               </div>
               <div className="address-inputs">
                 <div className="address-field">
-                  <span className="addr-icon">📍</span>
+                  <span className="addr-icon">🔵</span>
                   <input type="text" placeholder="Endereço de origem" value={origin}
                     onChange={e => setOrigin(e.target.value)} required />
                 </div>
                 <div className="address-field">
-                  <span className="addr-icon">🔴</span>
+                  <span className="addr-icon">🟡</span>
                   <input type="text" placeholder="Parada 1 (opcional)" value={parada1}
                     onChange={e => setParada1(e.target.value)} />
                 </div>
                 <div className="address-field">
-                  <span className="addr-icon">🔴</span>
+                  <span className="addr-icon">🟠</span>
                   <input type="text" placeholder="Parada 2 (opcional)" value={parada2}
                     onChange={e => setParada2(e.target.value)} />
                 </div>
                 <div className="address-field">
-                  <span className="addr-icon">🔴</span>
+                  <span className="addr-icon">🟣</span>
                   <input type="text" placeholder="Parada 3 (opcional)" value={parada3}
                     onChange={e => setParada3(e.target.value)} />
                 </div>
                 <div className="address-field">
-                  <span className="addr-icon">🎯</span>
+                  <span className="addr-icon">🔴</span>
                   <input type="text" placeholder="Endereço de destino" value={destination}
                     onChange={e => setDestination(e.target.value)} required />
                 </div>
