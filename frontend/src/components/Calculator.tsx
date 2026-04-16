@@ -84,8 +84,29 @@ async function tryOsrm(server: string, coords: string, alternatives: boolean) {
 async function getRoute(waypoints: Coords[], type: 'fastest' | 'shortest') {
   const shortest = type === 'shortest'
 
-  // Tenta Valhalla auto com múltiplos waypoints
-  const vResult = await tryValhallaWaypoints(waypoints, shortest)
+  // Para "shortest", sempre usa OSRM com alternativas para achar a menor distância real
+  if (shortest) {
+    const coords  = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
+    const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
+    let routes: any[] | null = null
+    for (const server of servers) {
+      routes = await tryOsrm(server, coords, true) // true = pedir alternativas
+      if (routes) break
+    }
+    if (!routes) throw new Error('Nenhum servidor de rota disponível')
+
+    // Escolhe a rota com MENOR DISTÂNCIA (verdadeiro "mais curta")
+    const route = routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
+    const distKm = Math.round(route.distance / 1000 * 10) / 10
+    const secs   = route.duration
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    const routeCoords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
+    return { distKm, duration: h > 0 ? `${h}h${m > 0 ? m + 'min' : ''}` : `${m}min`, routeCoords }
+  }
+
+  // Para "fastest", tenta Valhalla auto
+  const vResult = await tryValhallaWaypoints(waypoints, false)
   if (vResult) {
     const { distKm, secs, routeCoords } = vResult
     const h = Math.floor(secs / 3600)
@@ -98,14 +119,12 @@ async function getRoute(waypoints: Coords[], type: 'fastest' | 'shortest') {
   const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
   let routes: any[] | null = null
   for (const server of servers) {
-    routes = await tryOsrm(server, coords, shortest)
+    routes = await tryOsrm(server, coords, false)
     if (routes) break
   }
   if (!routes) throw new Error('Nenhum servidor de rota disponível')
 
-  const route = shortest
-    ? routes.slice().sort((a: any, b: any) => a.distance - b.distance)[0]
-    : routes[0]
+  const route = routes[0]
   const distKm = Math.round(route.distance / 1000 * 10) / 10
   const secs   = route.duration
   const h = Math.floor(secs / 3600)
