@@ -35,15 +35,11 @@ function decodePolyline6(encoded: string): [number, number][] {
   return coords
 }
 
-// ── Valhalla auto ──────────────────────────────────────────────────────────
-// Perfil "auto" segue rotas costeiras (BR-101) sem penalizar serras
-async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
+// ── Valhalla auto com múltiplos waypoints ──────────────────────────────────
+async function tryValhallaWaypoints(waypoints: Coords[], shortest: boolean) {
   try {
     const body = {
-      locations: [
-        { lon: origin.lng, lat: origin.lat },
-        { lon: dest.lng,   lat: dest.lat   },
-      ],
+      locations: waypoints.map(w => ({ lon: w.lng, lat: w.lat })),
       costing: 'auto',
       directions_type: 'none',
       costing_options: { auto: { shortest } },
@@ -56,12 +52,20 @@ async function tryValhalla(origin: Coords, dest: Coords, shortest: boolean) {
     })
     if (!res.ok) return null
     const data = await res.json()
-    const leg = data?.trip?.legs?.[0]
-    if (!leg?.shape || typeof leg.shape !== 'string') return null
-    const distKm      = Math.round(leg.summary.length * 10) / 10
-    const secs        = leg.summary.time
-    const routeCoords = decodePolyline6(leg.shape)
-    return { distKm, secs, routeCoords }
+    let totalDist = 0, totalSecs = 0, allCoords: [number, number][] = []
+    // Valhalla retorna múltiplos legs para cada segmento
+    if (data?.trip?.legs) {
+      for (const leg of data.trip.legs) {
+        totalDist += leg.summary.length
+        totalSecs += leg.summary.time
+        if (leg.shape && typeof leg.shape === 'string') {
+          allCoords.push(...decodePolyline6(leg.shape))
+        }
+      }
+    }
+    if (allCoords.length === 0) return null
+    const distKm = Math.round(totalDist * 10) / 10
+    return { distKm, secs: totalSecs, routeCoords: allCoords }
   } catch { return null }
 }
 
@@ -76,11 +80,11 @@ async function tryOsrm(server: string, coords: string, alternatives: boolean) {
   return null
 }
 
-async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortest') {
+async function getRoute(waypoints: Coords[], type: 'fastest' | 'shortest') {
   const shortest = type === 'shortest'
 
-  // Tenta Valhalla auto (carro) — melhor para rotas costeiras
-  const vResult = await tryValhalla(origin, dest, shortest)
+  // Tenta Valhalla auto com múltiplos waypoints
+  const vResult = await tryValhallaWaypoints(waypoints, shortest)
   if (vResult) {
     const { distKm, secs, routeCoords } = vResult
     const h = Math.floor(secs / 3600)
@@ -89,7 +93,7 @@ async function getRoute(origin: Coords, dest: Coords, type: 'fastest' | 'shortes
   }
 
   // Fallback: OSRM
-  const coords  = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`
+  const coords  = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
   const servers = ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']
   let routes: any[] | null = null
   for (const server of servers) {
@@ -116,6 +120,9 @@ export default function Calculator() {
   const [consumption,  setConsumption]  = useState('8')
   const [fretePerKm,   setFretePerKm]   = useState('5.50')
   const [origin,       setOrigin]       = useState('')
+  const [parada1,      setParada1]      = useState('')
+  const [parada2,      setParada2]      = useState('')
+  const [parada3,      setParada3]      = useState('')
   const [destination,  setDestination]  = useState('')
   const [loading,      setLoading]      = useState(false)
   const [error,        setError]        = useState('')
@@ -152,12 +159,12 @@ export default function Calculator() {
     return () => clearTimeout(t)
   }, [origin, destination])
 
-  const calcular = async (orig: string, dest: string, includeVolta = false) => {
+  const calcular = async (orig: string, dest: string, includeVolta = false, stops?: string[]) => {
     if (!orig || !dest) return
     setLoading(true); setError('')
     if (!includeVolta) { setResult(null); setRouteCoords(undefined) }
     try {
-      // Geocodifica endereços uma vez
+      // Geocodifica origem e destino via API
       const geoRes = await apiClient.post('/api/calculate', {
         vehicleType, originAddress: orig, destinationAddress: dest
       })
@@ -165,8 +172,32 @@ export default function Calculator() {
       setOriginCoords(oCoords)
       setDestinationCoords(dCoords)
 
-      // Calcula IDA: orig → dest
-      const idaRoute = await getRoute(oCoords, dCoords, routeType)
+      // Monta array de waypoints
+      const waypoints: Coords[] = [oCoords]
+      if (stops && stops.length > 0) {
+        const geo = async (addr: string): Promise<Coords | undefined> => {
+          if (!addr) return undefined
+          try {
+            const r = await fetch(
+              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&countrycodes=br`,
+              { headers: { 'User-Agent': 'CBS-Frete' } }
+            )
+            const d = await r.json()
+            if (d?.length > 0) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }
+          } catch {}
+          return undefined
+        }
+        for (const stop of stops) {
+          if (stop) {
+            const stopCoords = await geo(stop)
+            if (stopCoords) waypoints.push(stopCoords)
+          }
+        }
+      }
+      waypoints.push(dCoords)
+
+      // Calcula IDA: origem → paradas → destino
+      const idaRoute = await getRoute(waypoints, routeType)
 
       // Usa rota da IDA no mapa
       setRouteCoords(idaRoute.routeCoords)
@@ -186,7 +217,8 @@ export default function Calculator() {
 
       // Se incluir volta, calcula também
       if (includeVolta) {
-        const voltaRoute = await getRoute(dCoords, oCoords, routeType)
+        const voltaWaypoints = waypoints.slice().reverse()
+        const voltaRoute = await getRoute(voltaWaypoints, routeType)
         totalDist = idaRoute.distKm + voltaRoute.distKm
         resultObj.ida = { distKm: idaRoute.distKm, duration: idaRoute.duration }
         resultObj.volta = { distKm: voltaRoute.distKm, duration: voltaRoute.duration }
@@ -207,12 +239,14 @@ export default function Calculator() {
     } finally { setLoading(false) }
   }
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); calcular(origin, destination) }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    calcular(origin, destination, false, [parada1, parada2, parada3])
+  }
 
   const handleVolta = () => {
     if (!origin || !destination) { setError('Endereços não definidos'); return }
-    // Calcula IDA + VOLTA com os endereços atuais
-    calcular(origin, destination, true)
+    calcular(origin, destination, true, [parada1, parada2, parada3])
   }
 
   const downloadPDF = async () => {
@@ -333,6 +367,21 @@ export default function Calculator() {
                   <span className="addr-icon">📍</span>
                   <input type="text" placeholder="Endereço de origem" value={origin}
                     onChange={e => setOrigin(e.target.value)} required />
+                </div>
+                <div className="address-field">
+                  <span className="addr-icon">🔴</span>
+                  <input type="text" placeholder="Parada 1 (opcional)" value={parada1}
+                    onChange={e => setParada1(e.target.value)} />
+                </div>
+                <div className="address-field">
+                  <span className="addr-icon">🔴</span>
+                  <input type="text" placeholder="Parada 2 (opcional)" value={parada2}
+                    onChange={e => setParada2(e.target.value)} />
+                </div>
+                <div className="address-field">
+                  <span className="addr-icon">🔴</span>
+                  <input type="text" placeholder="Parada 3 (opcional)" value={parada3}
+                    onChange={e => setParada3(e.target.value)} />
                 </div>
                 <div className="address-field">
                   <span className="addr-icon">🎯</span>
