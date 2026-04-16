@@ -8,10 +8,11 @@ interface RouteMapProps {
   destination?: { lat: number; lng: number }
   originAddress?:      string
   destinationAddress?: string
+  paradas?:     { coords: { lat: number; lng: number }; address: string }[]
   routeCoords?: [number, number][]
 }
 
-export default function RouteMap({ origin, destination, originAddress, destinationAddress, routeCoords }: RouteMapProps) {
+export default function RouteMap({ origin, destination, originAddress, destinationAddress, paradas, routeCoords }: RouteMapProps) {
   const mapRef      = useRef<HTMLDivElement>(null)
   const mapObj      = useRef<L.Map | null>(null)
   const markersRef  = useRef<L.Marker[]>([])
@@ -41,12 +42,38 @@ export default function RouteMap({ origin, destination, originAddress, destinati
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
       iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
     })
+    const paradaIcons = [
+      L.icon({ // Amarelo
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
+      }),
+      L.icon({ // Laranja
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
+      }),
+      L.icon({ // Roxo
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
+      })
+    ]
 
     if (origin) {
       const m = L.marker([origin.lat, origin.lng], { icon: blueIcon })
         .bindPopup(`<b>Origem</b><br>${originAddress || ''}`)
       m.addTo(mapObj.current!)
       markersRef.current.push(m)
+    }
+
+    if (paradas && paradas.length > 0) {
+      paradas.forEach((parada, idx) => {
+        const m = L.marker([parada.coords.lat, parada.coords.lng], { icon: paradaIcons[idx % paradaIcons.length] })
+          .bindPopup(`<b>Parada ${idx + 1}</b><br>${parada.address}`)
+        m.addTo(mapObj.current!)
+        markersRef.current.push(m)
+      })
     }
 
     if (destination) {
@@ -67,7 +94,7 @@ export default function RouteMap({ origin, destination, originAddress, destinati
 
       mapObj.current!.fitBounds(polyRef.current.getBounds(), { padding: [50, 50] })
     }
-  }, [origin, destination, routeCoords])
+  }, [origin, destination, paradas, routeCoords])
 
   return (
     <div className="route-map-container">

@@ -130,6 +130,7 @@ export default function Calculator() {
 
   const [originCoords,      setOriginCoords]      = useState<Coords | undefined>()
   const [destinationCoords, setDestinationCoords] = useState<Coords | undefined>()
+  const [paradasCoords,     setParadasCoords]     = useState<{ coords: Coords; address: string }[]>([])
   const [routeCoords,       setRouteCoords]       = useState<[number,number][] | undefined>()
 
   // Preview mapa ao digitar
@@ -174,6 +175,7 @@ export default function Calculator() {
 
       // Monta array de waypoints
       const waypoints: Coords[] = [oCoords]
+      const processedParadas: { coords: Coords; address: string }[] = []
       if (stops && stops.length > 0) {
         const geo = async (addr: string): Promise<Coords | undefined> => {
           if (!addr) return undefined
@@ -190,11 +192,15 @@ export default function Calculator() {
         for (const stop of stops) {
           if (stop) {
             const stopCoords = await geo(stop)
-            if (stopCoords) waypoints.push(stopCoords)
+            if (stopCoords) {
+              waypoints.push(stopCoords)
+              processedParadas.push({ coords: stopCoords, address: stop })
+            }
           }
         }
       }
       waypoints.push(dCoords)
+      setParadasCoords(processedParadas)
 
       // Calcula IDA: origem → paradas → destino
       const idaRoute = await getRoute(waypoints, routeType)
@@ -351,6 +357,7 @@ export default function Calculator() {
           destination={destinationCoords}
           originAddress={origin}
           destinationAddress={destination}
+          paradas={paradasCoords}
           routeCoords={routeCoords}
         />
       </div>
